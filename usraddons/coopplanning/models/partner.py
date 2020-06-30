@@ -3,9 +3,7 @@ from odoo import fields, models
 
 
 class Partner(models.Model):
-    _name = 'coopplanning.partner'
-    _description = 'Partner'
+    _inherit = 'res.partner'
 
-    name = fields.Char(required=True)
-    
-    language = fields.Char()
+    task_count = fields.Integer('N° task', compute='_number_task')
+    task_ids = fields.One2many('coopplanning.task', 'worker_id', string='Tasks')

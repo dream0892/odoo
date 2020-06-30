@@ -5,4 +5,10 @@
         <field name="res_model">library.book</field>
         <field name="view_mode">tree,form</field>
     </record>
+
+    <record id="copy_action" model="ir.actions.act_window">
+        <field name="name">Book Copies</field>
+        <field name="res_model">library.copy</field>
+        <field name="view_mode">tree,form</field>
+    </record>
 </odoo>

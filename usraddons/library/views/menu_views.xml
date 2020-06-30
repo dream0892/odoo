@@ -22,6 +22,14 @@
     />
 
     <menuitem
+            id="copy_menu_action"
+            name="Copies"
+            parent="library.book_menu"
+            sequence="20"
+            action="library.copy_action"
+    />
+
+    <menuitem
             id="partner_menu"
             name="Partners"
             parent="library.menu_root"
@@ -63,6 +71,6 @@
             name="Publishers"
             parent="library.settings_menu"
             sequence="10"
-            action="library.publisher_action"
+            action="library.partner_action"
     />
 </odoo>

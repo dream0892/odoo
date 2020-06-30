@@ -3,12 +3,9 @@ from odoo import fields, models
 
 
 class Partner(models.Model):
-    _name = 'library.partner'
-    _description = 'Partner'
+    _inherit = 'res.partner'
 
-    name = fields.Char()
-    email = fields.Char()
-    address = fields.Text()
-    partner_type = fields.Selection([('customer', 'Customer'), ('author', 'Author')], default="customer")
+    is_author = fields.Boolean(string="Is an Author", default="False")
+    is_publisher = fields.Boolean(string="Is a Publisher", default="False")
 
     rental_ids = fields.One2many('library.rental', 'customer_id', string='Rentals')

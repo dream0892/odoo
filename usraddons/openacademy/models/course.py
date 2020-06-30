@@ -6,10 +6,10 @@ class Course(models.Model):
     _name = 'openacademy.course'
     _description = 'Course'
 
-    name = fields.Char(string='Title', required=True)
+    name = fields.Char(name='Title', required=True)
     description = fields.Text()
 
-    responsible_id = fields.Many2one('openacademy.partner', ondelete='set null', string="Responsible")
+    responsible_id = fields.Many2one('res.users', ondelete='set null', string="Responsible")
     session_ids = fields.One2many('openacademy.session', 'course_id', string="Sessions")
 
     level = fields.Selection([('1', 'Easy'), ('2', 'Medium'), ('3', 'Hard')], string="Difficulty Level")
@@ -36,9 +36,9 @@ class Session(models.Model):
     end_date = fields.Date(default=fields.Date.today)
     duration = fields.Float(digits=(6, 2), help="Duration in days", default=1)
 
-    instructor_id = fields.Many2one('openacademy.partner', string="Instructor")
+    instructor_id = fields.Many2one('res.partner', string="Instructor")
     course_id = fields.Many2one('openacademy.course', ondelete='cascade', string="Course", required=True)
-    attendee_ids = fields.Many2many('openacademy.partner', string="Attendees")
+    attendee_ids = fields.Many2many('res.partner', string="Attendees")
     attendees_count = fields.Integer(compute='_get_attendees_count', store=True)
     seats = fields.Integer()
     taken_seats = fields.Float(compute='_compute_taken_seats', store=True)

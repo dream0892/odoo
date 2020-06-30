@@ -93,7 +93,7 @@
                         <field name="worker_ids" options="{'no_create': True}" nolabel="1" colspan="2">
                             <tree>
                                 <field name="name"/>
-                                <field name="language"/>
+                                <field name="lang"/>
                             </tree>
                         </field>
                     </group>

@@ -42,7 +42,7 @@ class TaskTemplate(models.Model):
     end_time = fields.Float()
 
     worker_nb = fields.Integer(string="Number of worker", help="Max number of worker for this task", default=1)
-    worker_ids = fields.Many2many('coopplanning.partner', string="Recurrent worker assigned")
+    worker_ids = fields.Many2many('res.partner', string="Recurrent worker assigned")
     active = fields.Boolean(default=True)
 
     task_area = fields.Char(related='task_type_id.area', string='Task Area')
@@ -69,7 +69,6 @@ class TaskTemplate(models.Model):
                 'end_time':         fields.Datetime.to_string(fields.Datetime.context_timestamp(self, today).replace(hour=h_end, minute=m_end, second=0).astimezone(UTC)),
             })
 
-    # Solution : Empty the field worker_ids when floating is selected to be sure no worker will be pre assigned to the task
     @api.onchange('floating')
     def _onchange_floating(self):
         if self.floating:
@@ -88,4 +87,4 @@ class Task(models.Model):
     start_time = fields.Datetime()
     end_time = fields.Datetime()
 
-    worker_id = fields.Many2one('coopplanning.partner')
+    worker_id = fields.Many2one('res.partner')
