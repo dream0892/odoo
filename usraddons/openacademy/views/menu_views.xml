@@ -42,4 +42,12 @@
             sequence="10"
             action="partner_action"
     />
+
+    <menuitem
+            id="partner_category_menu_action"
+            name="Contact Tags"
+            parent="openacademy.configuration_menu"
+            sequence="20"
+            action="partner_category_action"
+    />
 </odoo>

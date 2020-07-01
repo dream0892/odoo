@@ -30,6 +30,14 @@
     />
 
     <menuitem
+            id="author_menu_action"
+            name="Authors"
+            parent="library.book_menu"
+            sequence="30"
+            action="author_action"
+    />
+
+    <menuitem
             id="partner_menu"
             name="Partners"
             parent="library.menu_root"
@@ -60,6 +68,14 @@
     />
 
     <menuitem
+            id="payment_menu_action"
+            name="Payments"
+            parent="library.rental_menu"
+            sequence="20"
+            action="payment_action"
+    />
+
+    <menuitem
             id="settings_menu"
             name="Settings"
             parent="library.menu_root"
@@ -72,5 +88,13 @@
             parent="library.settings_menu"
             sequence="10"
             action="library.partner_action"
+    />
+
+    <menuitem
+            id="price_menu_action"
+            name="Prices"
+            parent="library.book_menu"
+            sequence="20"
+            action="price_action"
     />
 </odoo>

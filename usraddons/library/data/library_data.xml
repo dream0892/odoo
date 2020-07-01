@@ -35,12 +35,13 @@
         <field name="is_publisher" eval="True"/>
     </record>
 
-    <record id="book_got" model="library.book">
+    <record id="book_got" model="product.product">
         <field name="name">Game of Thrones</field>
         <field name="edition_date">1996-08-01</field>
         <field name="isbn">0-553-10354-7</field>
         <field name="publisher_id" ref="publisher_got"/>
         <field name="author_ids" eval="[(4, ref('author_martin'))]"/>
+        <field name="is_book">1</field>
     </record>
 
     <record id="copy01" model="library.copy">
@@ -56,5 +57,18 @@
     <record id="copy03" model="library.copy">
         <field name="book_id" ref="book_got"/>
         <field name="reference">GOT-03</field>
+    </record>
+
+    <record id="price_rent" model="library.price">
+        <field name="name">Week fee</field>
+        <field name="duration">1</field>
+        <field name="price">0.2</field>
+        <field name="type">time</field>
+    </record>
+
+    <record id="price_loss" model="library.price">
+        <field name="name">Loss fee</field>
+        <field name="price">20</field>
+        <field name="type">one</field>
     </record>
 </odoo>

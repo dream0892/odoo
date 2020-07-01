@@ -8,7 +8,7 @@
                    """,
 
     'description': """
-        Manage a Library: customers, books, etc.... 
+        Manage a Library: customers, books, etc....
     """,
 
     'author':      "Odoo",
@@ -18,10 +18,10 @@
     # Check https://github.com/odoo/odoo/blob/master/odoo/addons/base/data/ir_module_category_data.xml
     # for the full list
     'category':    'Library',
-    'version':     '0.5',
+    'version':     '0.6',
 
     # any module necessary for this one to work correctly
-    'depends':     ['base'],
+    'depends':     ['base', 'product'],
 
     # always loaded
     'data':        [
@@ -29,7 +29,12 @@
         "views/book_views.xml",
         "views/partner_views.xml",
         "views/rental_views.xml",
+        "views/author_views.xml",
+        "views/payment_views.xml",
+        "views/price_views.xml",
         "views/menu_views.xml",
+        "data/cron.xml",
+        "data/mail.xml",
         "data/library_data.xml",
     ],
     # only loaded in demonstration mode

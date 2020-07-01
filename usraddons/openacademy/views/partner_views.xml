@@ -24,16 +24,15 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
-            <group name="purchase" position="after">
-                <group string="Open Academy" name="openacademy">
-                    <field name="instructor"/>
-                </group>
-            </group>
-            <page name="sales_purchases" position="after">
-                <page string="Attended Sessions" name="openacademy">
-                    <field name="session_ids"/>
+            <notebook position="inside">
+                <page string="Sessions">
+                    <group>
+                        <field name="instructor"/>
+                        <field name="level"/>
+                        <field name="session_ids"/>
+                    </group>
                 </page>
-            </page>
+            </notebook>
         </field>
     </record>
 
@@ -51,6 +50,12 @@
     <record id="partner_action" model="ir.actions.act_window">
         <field name="name">Contacts</field>
         <field name="res_model">res.partner</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="partner_category_action" model="ir.actions.act_window">
+        <field name="name">Contact Tags</field>
+        <field name="res_model">res.partner.category</field>
         <field name="view_mode">tree,form</field>
     </record>
 
