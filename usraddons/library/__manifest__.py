@@ -18,7 +18,7 @@
     # Check https://github.com/odoo/odoo/blob/master/odoo/addons/base/data/ir_module_category_data.xml
     # for the full list
     'category':    'Library',
-    'version':     '0.6',
+    'version':     '0.7',
 
     # any module necessary for this one to work correctly
     'depends':     ['base', 'product'],
@@ -33,6 +33,7 @@
         "views/payment_views.xml",
         "views/price_views.xml",
         "views/menu_views.xml",
+        "wizard/select_books_views.xml",
         "data/cron.xml",
         "data/mail.xml",
         "data/library_data.xml",

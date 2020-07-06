@@ -5,6 +5,7 @@ from odoo import api, fields, models
 class Rentals(models.Model):
     _name = 'library.rental'
     _description = 'Book rental'
+    _order = "rental_date desc,return_date desc"
 
     customer_id = fields.Many2one('res.partner', string='Customer', domain=[('customer', '=', True)], required=True)
     copy_id = fields.Many2one('library.copy', string="Book Copy", domain=[('book_state', '=', 'available')], required=True)

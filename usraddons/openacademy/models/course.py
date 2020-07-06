@@ -16,6 +16,7 @@ class Course(models.Model):
 
     level = fields.Selection([('1', 'Easy'), ('2', 'Medium'), ('3', 'Hard')], string="Difficulty Level")
     session_count = fields.Integer(compute="_compute_session_count")
+    attendee_count = fields.Integer(compute="_compute_attendee_count")
 
     _sql_constraints = [
         ('name_description_check', 'CHECK(name != description)',
@@ -38,10 +39,27 @@ class Course(models.Model):
         default['name'] = new_name
         return super(Course, self).copy(default)
 
+    def open_attendees(self):
+        self.ensure_one()
+        attendee_ids = self.session_ids.mapped('attendee_ids')
+        return {
+            'name':      'Attendees of %s' % (self.name),
+            'type':      'ir.actions.act_window',
+            'res_model': 'res.partner',
+            'view_mode': 'tree,form',
+            'view_type': 'form',
+            'domain':    [('id', 'in', attendee_ids.ids)],
+        }
+
     @api.depends('session_ids')
     def _compute_session_count(self):
         for course in self:
             course.session_count = len(course.session_ids)
+
+    @api.depends('session_ids.attendees_count')
+    def _compute_attendee_count(self):
+        for course in self:
+            course.attendee_count = len(course.mapped('session_ids.attendee_ids'))
 
 
 class Session(models.Model):
@@ -63,7 +81,7 @@ class Session(models.Model):
 
     instructor_id = fields.Many2one('res.partner', string="Instructor")
     course_id = fields.Many2one('openacademy.course', ondelete='cascade', string="Course", required=True)
-    attendee_ids = fields.Many2many('res.partner', string="Attendees")
+    attendee_ids = fields.Many2many('res.partner', string="Attendees", domain="[('is_company', '=', False)]")
     attendees_count = fields.Integer(compute='_get_attendees_count', store=True)
     seats = fields.Integer()
     taken_seats = fields.Float(compute='_compute_taken_seats', store=True)
