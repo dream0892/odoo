@@ -41,7 +41,9 @@
                     <group>
                         <field name="can_edit_responsible" invisible="1"/>
                         <field name="responsible_id" attrs="{'readonly': [('can_edit_responsible', '=', False)]}"/>
-                        <field name="level"/>
+                        <field name="level" widget="radio"/>
+                        <field name="currency_id"/>
+                        <field name="price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                     </group>
                     <notebook>
                         <page string="Description" name="desc">
@@ -61,7 +63,27 @@
                         </page>
                     </notebook>
                 </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
             </form>
+        </field>
+    </record>
+
+    <record id="course_view_search" model="ir.ui.view">
+        <field name="name">openacademy.course.search</field>
+        <field name="model">openacademy.course</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="responsible_id"/>
+                <field name="description"/>
+                <filter name="my_courses" string="My Courses"
+                        domain="[('responsible_id', '=', uid)]"/>
+                <filter name="by_responsible" string="Responsible"
+                        context="{'group_by': 'responsible_id'}"/>
+            </search>
         </field>
     </record>
 

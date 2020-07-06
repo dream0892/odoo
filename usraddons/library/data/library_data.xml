@@ -26,13 +26,13 @@
         <field name="name">George R.R. Martin</field>
         <field name="email">george@got.org</field>
         <field name="street">Bayonne, New Jersey, United States</field>
-        <field name="is_author" eval="True"/>
+        <field name="author" eval="True"/>
     </record>
 
     <record id="publisher_got" model="res.partner">
         <field name="name">Bantam Spectra</field>
         <field name="is_company" eval="True"/>
-        <field name="is_publisher" eval="True"/>
+        <field name="publisher" eval="True"/>
     </record>
 
     <record id="book_got" model="product.product">
@@ -41,7 +41,7 @@
         <field name="isbn">0-553-10354-7</field>
         <field name="publisher_id" ref="publisher_got"/>
         <field name="author_ids" eval="[(4, ref('author_martin'))]"/>
-        <field name="is_book">1</field>
+        <field name="book">1</field>
     </record>
 
     <record id="copy01" model="library.copy">

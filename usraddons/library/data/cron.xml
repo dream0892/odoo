@@ -5,6 +5,7 @@
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
         <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
         <field name="model_id" ref="library.model_library_rental"/>
         <field name="code">model._cron_check_date()</field>
     </record>

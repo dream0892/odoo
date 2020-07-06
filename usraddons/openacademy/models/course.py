@@ -7,6 +7,7 @@ from odoo import api, exceptions, fields, models
 class Course(models.Model):
     _name = 'openacademy.course'
     _description = 'Course'
+    _inherit = 'mail.thread'
 
     name = fields.Char(name='Title', required=True)
     description = fields.Text()
@@ -19,6 +20,12 @@ class Course(models.Model):
     level = fields.Selection([('1', 'Easy'), ('2', 'Medium'), ('3', 'Hard')], string="Difficulty Level")
     session_count = fields.Integer(compute="_compute_session_count")
     attendee_count = fields.Integer(compute="_compute_attendee_count")
+
+    fname = fields.Char('Filename')
+    datas = fields.Binary('File')
+    currency_id = fields.Many2one('res.currency', 'Currency')
+
+    price = fields.Float('Price')
 
     _sql_constraints = [
         ('name_description_check', 'CHECK(name != description)',
@@ -87,11 +94,14 @@ class Session(models.Model):
 
     instructor_id = fields.Many2one('res.partner', string="Instructor")
     course_id = fields.Many2one('openacademy.course', ondelete='cascade', string="Course", required=True)
-    attendee_ids = fields.Many2many('res.partner', string="Attendees", domain="[('is_company', '=', False)]")
+    attendee_ids = fields.Many2many('res.partner', string="Attendees", domain="[('is_company', '=', True)]")
     attendees_count = fields.Integer(compute='_get_attendees_count', store=True)
     seats = fields.Integer()
     taken_seats = fields.Float(compute='_compute_taken_seats', store=True)
     percentage_per_day = fields.Integer("%", default=100)
+
+    is_paid = fields.Boolean('Is paid')
+    product_id = fields.Many2one('product.template', 'Product')
 
     def _warning(self, title, message):
         return {'warning': {
@@ -181,3 +191,26 @@ class Session(models.Model):
         if vals.get('instructor_id'):
             res.message_subscribe([vals['instructor_id']])
         return res
+
+    def create_invoice_teacher(self):
+        teacher_invoice = self.env['account.invoice'].search([
+            ('partner_id', '=', self.instructor_id.id)
+        ], limit=1)
+
+        if not teacher_invoice:
+            teacher_invoice = self.env['account.invoice'].create({
+                'partner_id': self.instructor_id.id,
+            })
+
+        # install module accounting and a chart of account to have at least one expense account in your CoA
+        expense_account = self.env['account.account'].search([('user_type_id', '=', self.env.ref('account.data_account_type_expenses').id)], limit=1)
+        self.env['account.invoice.line'].create({
+            'invoice_id': teacher_invoice.id,
+            'product_id': self.product_id.id,
+            'price_unit': self.product_id.lst_price,
+            'account_id': expense_account.id,
+            'name':       'Session',
+            'quantity':   1,
+        })
+
+        self.write({'is_paid': True})

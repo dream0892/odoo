@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import models, fields, api
 
 
 class Rentals(models.Model):
@@ -9,12 +9,10 @@ class Rentals(models.Model):
 
     customer_id = fields.Many2one('res.partner', string='Customer', domain=[('customer', '=', True)], required=True)
     copy_id = fields.Many2one('library.copy', string="Book Copy", domain=[('book_state', '=', 'available')], required=True)
-    book_id = fields.Many2one('product.product', string='Book', domain=[('is_book', '=', True)], related='copy_id.book_id', readonly=True)
-
+    book_id = fields.Many2one('product.product', string='Book', domain=[('book', '=', True)], related='copy_id.book_id', readonly=True)
     rental_date = fields.Date(default=fields.Date.context_today, required=True)
     return_date = fields.Date(required=True)
     state = fields.Selection([('draft', 'Draft'), ('rented', 'Rented'), ('returned', 'Returned'), ('lost', 'Lost')], default="draft")
-
     customer_address = fields.Text(compute='_compute_customer_address')
     customer_email = fields.Char(related='customer_id.email')
 
@@ -46,8 +44,8 @@ class Rentals(models.Model):
 
             self.env['library.payment'].create({
                 'customer_id': rec.customer_id.id,
-                'date':        rec.rental_date,
-                'amount':      - amount,
+                'date': rec.rental_date,
+                'amount': - amount,
             })
 
     def action_return(self):
