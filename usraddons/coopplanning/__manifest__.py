@@ -8,7 +8,7 @@
                    """,
 
     'description': """
-        Manage a cooperative group 
+        Manage a cooperative group
     """,
 
     'author':      "Odoo",
@@ -31,6 +31,7 @@
         "views/menu_views.xml",
         "data/coop_data.xml",
         "data/task_template.xml",
+        "report/report.xml",
     ],
     # only loaded in demonstration mode
     'demo':        [],

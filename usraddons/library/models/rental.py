@@ -7,7 +7,7 @@ class Rentals(models.Model):
     _description = 'Book rental'
     _order = "rental_date desc,return_date desc"
 
-    customer_id = fields.Many2one('res.partner', string='Customer', domain=[('customer', '=', True)], required=True)
+    customer_id = fields.Many2one('res.partner', string='Customer', required=True)
     copy_id = fields.Many2one('library.copy', string="Book Copy", domain=[('book_state', '=', 'available')], required=True)
     book_id = fields.Many2one('product.product', string='Book', domain=[('book', '=', True)], related='copy_id.book_id', readonly=True)
     rental_date = fields.Date(default=fields.Date.context_today, required=True)

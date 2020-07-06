@@ -37,4 +37,4 @@ class Payment(models.Model):
 
     date = fields.Date(required=True, default=fields.Date.context_today)
     amount = fields.Float()
-    customer_id = fields.Many2one('res.partner', 'Customer', domain=[('customer', '=', True)])
+    customer_id = fields.Many2one('res.partner', 'Customer')
