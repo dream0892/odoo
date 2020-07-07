@@ -1,0 +1,8 @@
+.o_search_panel.product_root {
+    flex: 0 0 350px;
+    padding: 6px;
+    scrollbar-width: thin;
+    .o_search_panel_section_header {
+        display: none;
+    }
+}

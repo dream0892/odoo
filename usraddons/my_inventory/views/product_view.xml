@@ -1,0 +1,19 @@
+<odoo>
+ <record id="product_template_form_view" model="ir.ui.view">
+            <field name="name">product.form.inherit</field>
+            <field name="model">product.product</field>
+            <field name="inherit_id" ref="product.product_template_form_view"/>
+            <field name="arch" type="xml">
+                <page name="inventory" position="after">
+                    <page string="properties" name="custom_properties">
+                        <group>
+                            <field name="luminous_length"/>
+                        </group>
+                        <group>
+                            <field name="luminous_width"/>
+                        </group>
+                    </page>
+                </page>
+            </field>
+        </record>
+</odoo>
