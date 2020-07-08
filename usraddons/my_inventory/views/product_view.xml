@@ -1,19 +1,47 @@
 <odoo>
- <record id="product_template_form_view" model="ir.ui.view">
-            <field name="name">product.form.inherit</field>
-            <field name="model">product.product</field>
-            <field name="inherit_id" ref="product.product_template_form_view"/>
-            <field name="arch" type="xml">
-                <page name="inventory" position="after">
-                    <page string="properties" name="custom_properties">
+    <record id="product_template_form_view" model="ir.ui.view">
+        <field name="name">product.form.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <page name="sales" position="before">
+                <page string="属性" name="custom_properties">
+                    <group>
                         <group>
                             <field name="luminous_length"/>
+                            <field name="luminous_width"/>
+                            <field name="irradiance"/>
                         </group>
                         <group>
-                            <field name="luminous_width"/>
+                            <field name="max_current"/>
+                            <field name="ref_substrate"/>
+                            <field name="chip_space"/>
                         </group>
-                    </page>
+                    </group>
                 </page>
+            </page>
+        </field>
+    </record>
+    <record id="product_template_tree_view" model="ir.ui.view">
+        <field name="name">product.list.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="irradiance"/>
             </field>
-        </record>
+        </field>
+    </record>
+    <record id="prodcut_template_search_view" model="ir.ui.view">
+        <field name="name">product.search.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <search position="inside">
+                <searchpanel class="product_root">
+                        <field name="categ_id" icon="fa-filter"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
 </odoo>

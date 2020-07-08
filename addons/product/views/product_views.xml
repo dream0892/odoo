@@ -159,9 +159,7 @@
                     <filter string="Product Type" name="type" context="{'group_by':'type'}"/>
                     <filter string="Product Category" name="categ_id" context="{'group_by':'categ_id'}"/>
                 </group>
-                <searchpanel class="">
-                        <field name="categ_id" icon="fa-filter"/>
-                    </searchpanel>
+
             </search>
         </field>
     </record>

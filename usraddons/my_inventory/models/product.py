@@ -10,11 +10,11 @@ OPERATORS = {
     '!=': py_operator.ne
 }
 
-class Product(models.Model):
-    _inherit = "product.product"
-    luminous_length = fields.Integer('Luminous length(mm)')
-    luminous_width = fields.Integer('luminous width(mm)')
-    irradiance = fields.Float('Irradiance(mw)')
-    max_current = fields.Integer('max current(mA)')
-    ref_substrate = fields.Many2one('product.product',string='reference substrate', ondelete='set null')
-    chip_space = fields.Integer('chip spacing(mm)')
+class ProductTemplate(models.Model):
+    _inherit = "product.template"
+    luminous_length = fields.Integer('发光长度(mm)')
+    luminous_width = fields.Integer('发光宽度(mm)')
+    irradiance = fields.Float('辐照度(mw)')
+    max_current = fields.Integer('最大电流(mA)')
+    ref_substrate = fields.Many2one('product.product',string='所用基板', ondelete='set null')
+    chip_space = fields.Integer('芯片间距(mm)')
