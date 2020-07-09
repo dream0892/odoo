@@ -18,3 +18,4 @@ class ProductTemplate(models.Model):
     max_current = fields.Integer('最大电流(mA)')
     ref_substrate = fields.Many2one('product.product',string='所用基板', ondelete='set null')
     chip_space = fields.Integer('芯片间距(mm)')
+    rated_power =fields.Integer('额定功率（w)')

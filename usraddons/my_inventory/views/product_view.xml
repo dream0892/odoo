@@ -13,6 +13,7 @@
                             <field name="irradiance"/>
                         </group>
                         <group>
+                            <field name="rated_power"/>
                             <field name="max_current"/>
                             <field name="ref_substrate"/>
                             <field name="chip_space"/>
@@ -28,7 +29,9 @@
         <field name="inherit_id" ref="product.product_template_tree_view"/>
         <field name="arch" type="xml">
             <field name="name" position="after">
-                <field name="irradiance"/>
+                <field name="irradiance" optional="show"/>
+                <field name="rated_power" optional="hide"/>
+                <field name="chip_space" optional="hide"/>
             </field>
         </field>
     </record>
