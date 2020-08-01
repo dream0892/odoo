@@ -499,6 +499,7 @@ class AccountMove(models.Model):
             move = base_line.move_id
 
             if move.is_invoice(include_receipts=True):
+                handle_price_include = True
                 sign = -1 if move.is_inbound() else 1
                 quantity = base_line.quantity
                 if base_line.currency_id:
@@ -507,15 +508,15 @@ class AccountMove(models.Model):
                 else:
                     price_unit_foreign_curr = 0.0
                     price_unit_comp_curr = sign * base_line.price_unit * (1 - (base_line.discount / 100.0))
+                tax_type = 'sale' if move.type.startswith('out_') else 'purchase'
+                is_refund = move.type in ('out_refund', 'in_refund')
             else:
+                handle_price_include = False
                 quantity = 1.0
                 price_unit_foreign_curr = base_line.amount_currency
                 price_unit_comp_curr = base_line.balance
-
-            if move.is_invoice(include_receipts=True):
-                handle_price_include = True
-            else:
-                handle_price_include = False
+                tax_type = base_line.tax_ids[0].type_tax_use if base_line.tax_ids else None
+                is_refund = (tax_type == 'sale' and base_line.debit) or (tax_type == 'purchase' and base_line.credit)
 
             balance_taxes_res = base_line.tax_ids._origin.compute_all(
                 price_unit_comp_curr,
@@ -523,9 +524,18 @@ class AccountMove(models.Model):
                 quantity=quantity,
                 product=base_line.product_id,
                 partner=base_line.partner_id,
-                is_refund=self.type in ('out_refund', 'in_refund'),
+                is_refund=is_refund,
                 handle_price_include=handle_price_include,
             )
+
+            if move.type == 'entry':
+                repartition_field = is_refund and 'refund_repartition_line_ids' or 'invoice_repartition_line_ids'
+                repartition_tags = base_line.tax_ids.mapped(repartition_field).filtered(lambda x: x.repartition_type == 'base').tag_ids
+                tags_need_inversion = (tax_type == 'sale' and not is_refund) or (tax_type == 'purchase' and is_refund)
+                if tags_need_inversion:
+                    balance_taxes_res['base_tags'] = base_line._revert_signed_tags(repartition_tags).ids
+                    for tax_res in balance_taxes_res['taxes']:
+                        tax_res['tag_ids'] = base_line._revert_signed_tags(self.env['account.account.tag'].browse(tax_res['tag_ids'])).ids
 
             if base_line.currency_id:
                 # Multi-currencies mode: Taxes are computed both in company's currency / foreign currency.
@@ -536,7 +546,18 @@ class AccountMove(models.Model):
                     product=base_line.product_id,
                     partner=base_line.partner_id,
                     is_refund=self.type in ('out_refund', 'in_refund'),
+                    handle_price_include=handle_price_include,
                 )
+
+                if move.type == 'entry':
+                    repartition_field = is_refund and 'refund_repartition_line_ids' or 'invoice_repartition_line_ids'
+                    repartition_tags = base_line.tax_ids.mapped(repartition_field).filtered(lambda x: x.repartition_type == 'base').tag_ids
+                    tags_need_inversion = (tax_type == 'sale' and not is_refund) or (tax_type == 'purchase' and is_refund)
+                    if tags_need_inversion:
+                        balance_taxes_res['base_tags'] = base_line._revert_signed_tags(repartition_tags).ids
+                        for tax_res in balance_taxes_res['taxes']:
+                            tax_res['tag_ids'] = base_line._revert_signed_tags(self.env['account.account.tag'].browse(tax_res['tag_ids'])).ids
+
                 for b_tax_res, ac_tax_res in zip(balance_taxes_res['taxes'], amount_currency_taxes_res['taxes']):
                     tax = self.env['account.tax'].browse(b_tax_res['id'])
                     b_tax_res['amount_currency'] = ac_tax_res['amount']
@@ -2699,10 +2720,10 @@ class AccountMoveLine(models.Model):
         accounts = self.product_id.product_tmpl_id.get_product_accounts(fiscal_pos=fiscal_position)
         if self.move_id.is_sale_document(include_receipts=True):
             # Out invoice.
-            return accounts['income']
+            return accounts['income'] or self.account_id
         elif self.move_id.is_purchase_document(include_receipts=True):
             # In invoice.
-            return accounts['expense']
+            return accounts['expense'] or self.account_id
 
     def _get_computed_taxes(self):
         self.ensure_one()
@@ -3164,7 +3185,7 @@ class AccountMoveLine(models.Model):
                     # Cash basis entries are always treated as misc operations, applying the tag sign directly to the balance
                     type_multiplicator = 1
                 else:
-                    type_multiplicator = (record.journal_id.type == 'sale' and -1 or 1) * (record.move_id.type in ('in_refund', 'out_refund') and -1 or 1)
+                    type_multiplicator = (record.journal_id.type == 'sale' and -1 or 1) * (self._get_refund_tax_audit_condition(record) and -1 or 1)
 
                 tag_amount = type_multiplicator * (tag.tax_negate and -1 or 1) * record.balance
 
@@ -3179,6 +3200,13 @@ class AccountMoveLine(models.Model):
                     audit_str += tag.name + ': ' + formatLang(self.env, tag_amount, currency_obj=currency)
 
             record.tax_audit = audit_str
+
+    def _get_refund_tax_audit_condition(self, aml):
+        """ Returns the condition to be used for the provided move line to tell
+        whether or not it comes from a refund operation.
+        This is overridden by pos in order to treat returns properly.
+        """
+        return aml.move_id.type in ('in_refund', 'out_refund') and -1 or 1
 
     # -------------------------------------------------------------------------
     # CONSTRAINT METHODS
@@ -3454,6 +3482,10 @@ class AccountMoveLine(models.Model):
 
     def unlink(self):
         moves = self.mapped('move_id')
+
+        # Prevent deleting lines on posted entries
+        if any(m.state == 'posted' for m in moves):
+            raise UserError(_('You cannot delete an item linked to a posted entry.'))
 
         # Check the lines are not reconciled (partially or not).
         self._check_reconciliation()
@@ -4140,19 +4172,23 @@ class AccountMoveLine(models.Model):
         tax_multiplicator = (self.journal_id.type == 'sale' and -1 or 1) * (self.move_id.type in ('in_refund', 'out_refund') and -1 or 1)
         if tax_multiplicator == -1:
             # Take the opposite tags instead
-            rslt = self.env['account.account.tag']
-            for tag in tags:
-                if tag.tax_report_line_ids:
-                    # tag created by an account.tax.report.line
-                    new_tag = tag.tax_report_line_ids[0].tag_ids.filtered(lambda x: x.tax_negate != tag.tax_negate)
-                    rslt += new_tag
-                else:
-                    # tag created in data for use by an account.financial.html.report.line
-                    rslt += tag
-
-            return rslt
+            return self._revert_signed_tags(tags)
 
         return tags
+
+    @api.model
+    def _revert_signed_tags(self, tags):
+        rslt = self.env['account.account.tag']
+        for tag in tags:
+            if tag.tax_report_line_ids:
+                # tag created by an account.tax.report.line
+                new_tag = tag.tax_report_line_ids[0].tag_ids.filtered(lambda x: x.tax_negate != tag.tax_negate)
+                rslt += new_tag
+            else:
+                # tag created in data for use by an account.financial.html.report.line
+                rslt += tag
+
+        return rslt
 
 
 class AccountPartialReconcile(models.Model):

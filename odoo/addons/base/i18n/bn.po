@@ -7,9 +7,9 @@
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 13.0+e\n"
+"Project-Id-Version: Odoo Server 13.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-06-25 09:16+0000\n"
+"POT-Creation-Date: 2020-07-23 15:12+0000\n"
 "PO-Revision-Date: 2019-08-26 09:06+0000\n"
 "Last-Translator: Abu Zafar <azmikbal@gmail.com>, 2020\n"
 "Language-Team: Bengali (https://www.transifex.com/odoo/teams/41243/bn/)\n"
@@ -1276,7 +1276,7 @@ msgid ""
 "Setup\n"
 "-----\n"
 "\n"
-"- *Configuration > Journals*\n"
+"- *Account > Configuration > invoicing > Journals*\n"
 "\n"
 "    If needed, create new journal or choose an existing journal with **Type**\n"
 "    set to *“Bank”*.\n"
@@ -1285,28 +1285,9 @@ msgid ""
 "\n"
 "    On the **Bank Account** tab, enter the **Account Number**.\n"
 "\n"
-"- *Configuration > Bank Accounts*\n"
-"\n"
-"    Account will show up in list as the journal name.\n"
-"\n"
-"    Editing will show the **Account Number**.  This is important as it is used by\n"
-"    the ABA process.\n"
-"\n"
-"    **Bank** is optional.\n"
-"\n"
-"- *Sales > Configuration > Bank Accounts > Bank Accounts*\n"
-"\n"
-"    Account will show up in list as the account number.\n"
-"\n"
-"    **ABA Payments** - Set to *“Account for Making ABA Payments”*.\n"
+"    On the same tab, ensure the ABA transfer information is set up.\n"
 "\n"
 "    **BSB** - Required, 6 digits, and will be auto formatted.\n"
-"\n"
-"    **Account Holder** - Optional.\n"
-"\n"
-"    **Account / Payee Name** - Required.  Generally not validated by the banks\n"
-"    on ABA file transfers, and may show up on the payee bank statement against\n"
-"    the payment.\n"
 "\n"
 "    **Financial Institution Code** - Required (provided by bank or can be found\n"
 "    on Google).  It is three uppercase 3 characters.\n"
@@ -1315,30 +1296,42 @@ msgid ""
 "    may reject the ABA file if the Supplying User Name is not as expected.  It\n"
 "    cannot be longer than 26 characters.\n"
 "\n"
-"    **Identification Number (APCA)** - User Identification number is bank\n"
+"    **APCA Identification Number** - User Identification number is bank\n"
 "    allocated.  It is 6 digits.\n"
 "\n"
 "    **Include Self Balancing Transaction** - Some institutions require that the\n"
 "    last be a self balancing transaction which is used as a verification.\n"
 "\n"
+"- *Accounting > Configuration > Payments > Bank Accounts*\n"
+"\n"
+"    Account will show up in list as the journal name.\n"
+"\n"
+"    Editing will show the **Account Number**.  This is important as it is used by\n"
+"    the ABA process.\n"
+"\n"
+"    **Bank** is optional.\n"
+"\n"
+"- *Contacts > Configuration > Bank Accounts > Bank Accounts*\n"
+"\n"
+"    Paying account will show up in list as the account number.\n"
+"\n"
+"    **Account Holder Name** - Can be entered here, if Required.  Generally not\n"
+"    validated by the banks on ABA file transfers, but may show up on the payee\n"
+"    bank statement against the payment.\n"
+"\n"
 "- Vendor bank accounts can be set up in the same place, however, it is\n"
 "  generally easier to set them up from the partner from for the Vendor.\n"
 "\n"
-"- *Accounting > Purchases > Vendors*\n"
+"- *Accounting > Vendors > Vendors*\n"
 "\n"
-"    On **Sales & Purchases** tab, click on *\"Bank account(s)\"* from where a\n"
+"    On **Accounting** tab, click on *\"View accounts detail\"* from where a\n"
 "    vendor bank account can be created or edited.\n"
 "\n"
-"    **Account Number** - Required.\n"
-"\n"
-"    **ABA Payments** - Set to *“Allow ABA Payments to this Account”*.\n"
+"    **Account Number** - Required, must be less than 9 digits.\n"
 "\n"
 "    **BSB** - Required, 6 digits, and will be auto formatted.\n"
 "\n"
-"    **Account Holder** - Optional.\n"
-"\n"
-"    **Account / Payee Name** - Required.  Generally not validated by the\n"
-"    banks.\n"
+"    **Account Holder Name** - Optional.\n"
 "\n"
 "Use\n"
 "---\n"
@@ -1352,18 +1345,22 @@ msgid ""
 "    Select **ABA Credit Transfer** radio button.\n"
 "\n"
 "    If the vendor has multiple bank account, you may need to select the\n"
-"    correct **Recipient Bank Account**.\n"
+"    correct **Recipient Bank Account**.  Or if paying a vendor bill, it may\n"
+"    need the correct bank account associated with it.\n"
 "\n"
 "    Enter payment amount, etc.\n"
 "\n"
-"- *Purchases > Payments*\n"
+"- *Vendors > Payments*\n"
 "\n"
 "    After payment(s) are confirmed, they will show up in the payments list.\n"
 "\n"
 "    Using filters, or sorting, select the payments to be included.  Under\n"
-"    *Actions* choose *Download ABA Payment*.  A pop up appears with the ABA\n"
-"    file from which you can click on the file to download locally.  This\n"
-"    file can then be uploaded to the bank.\n"
+"    *Actions* choose *Create batch payment*.\n"
+"\n"
+"- *Vendors > Batch Payments*\n"
+"\n"
+"    When validating a batch payment, the ABA file will be generated.  It can\n"
+"    be regenerated.  This file can then be uploaded to the bank.\n"
 msgstr ""
 
 #. module: base
@@ -5805,7 +5802,7 @@ msgstr ""
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.res_lang_form
 msgid "%a - Abbreviated weekday name."
-msgstr ""
+msgstr "%a- সংক্ষিপ্ত সপ্তাহের নাম"
 
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.res_lang_form
@@ -5840,7 +5837,7 @@ msgstr ""
 #: code:addons/base/models/res_users.py:0
 #, python-format
 msgid "%s (copy)"
-msgstr ""
+msgstr "%sঅনুলিপি"
 
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.res_lang_form
@@ -5855,7 +5852,7 @@ msgstr ""
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.module_view_kanban
 msgid "&amp;nbsp;"
-msgstr ""
+msgstr "&amp;nbsp;"
 
 #. module: base
 #: code:addons/base/models/ir_fields.py:0
@@ -5919,11 +5916,27 @@ msgid ", required"
 msgstr ""
 
 #. module: base
+#: code:addons/models.py:0
+#, python-format
+msgid ""
+"- %(record)r belongs to company %(company)r and %(field)r (%(fname)s: "
+"%(values)s) belongs to another company."
+msgstr ""
+
+#. module: base
 #: code:addons/model.py:0
 #, python-format
 msgid ""
 "- Create/update: a mandatory field is not set.\n"
 "- Delete: another model requires the record being deleted. If possible, archive it instead."
+msgstr ""
+
+#. module: base
+#: code:addons/models.py:0
+#, python-format
+msgid ""
+"- Record is company %(company)r and %(field)r (%(fname)s: %(values)s) "
+"belongs to another company."
 msgstr ""
 
 #. module: base
@@ -6788,7 +6801,7 @@ msgstr ""
 #. module: base
 #: model:ir.model.fields,field_description:base.field_ir_attachment__access_token
 msgid "Access Token"
-msgstr ""
+msgstr "অ্যাক্সেস টোকন"
 
 #. module: base
 #: model:ir.module.module,summary:base.module_documents_hr
@@ -7111,7 +7124,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:base.view_currency_search
 #: model_terms:ir.ui.view,arch_db:base.view_view_search
 msgid "Active"
-msgstr ""
+msgstr "সক্রিয়"
 
 #. module: base
 #: model:ir.model.fields,field_description:base.field_res_partner__active_lang_count
@@ -7867,7 +7880,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:base.view_sequence_search
 #: model_terms:ir.ui.view,arch_db:base.view_users_form
 msgid "Archived"
-msgstr ""
+msgstr "আর্কাইভ করা"
 
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.base_partner_merge_automatic_wizard_form
@@ -8037,7 +8050,7 @@ msgstr ""
 #: model:ir.module.module,description:base.module_payment_authorize
 #: model:ir.module.module,shortdesc:base.module_payment_authorize
 msgid "Authorize.Net Payment Acquirer"
-msgstr ""
+msgstr "অনুমোদন. নেট পেমেন্ট গ্রহীতা "
 
 #. module: base
 #: model:ir.model.fields,field_description:base.field_ir_module_module_dependency__auto_install_required
@@ -8846,7 +8859,7 @@ msgstr ""
 #. module: base
 #: model:res.country,name:base.ca
 msgid "Canada"
-msgstr ""
+msgstr "কানাডা"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_l10n_ca
@@ -9365,7 +9378,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:base.view_company_tree
 #: model_terms:ir.ui.view,arch_db:base.view_res_partner_filter
 msgid "Companies"
-msgstr ""
+msgstr "কোম্পানি"
 
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.view_users_form
@@ -10127,7 +10140,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:base.field_wizard_ir_model_menu_create__create_uid
 #: model_terms:ir.ui.view,arch_db:base.view_attachment_search
 msgid "Created by"
-msgstr ""
+msgstr "দ্বারা সৃষ্টি"
 
 #. module: base
 #: model:ir.model.fields,field_description:base.field_base_document_layout__create_date
@@ -10204,7 +10217,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:base.field_reset_view_arch_wizard__create_date
 #: model:ir.model.fields,field_description:base.field_wizard_ir_model_menu_create__create_date
 msgid "Created on"
-msgstr ""
+msgstr "তৈরি"
 
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.view_attachment_form
@@ -11254,7 +11267,7 @@ msgstr ""
 #: model:ir.model.fields.selection,name:base.selection__ir_actions_todo__state__done
 #: model:ir.model.fields.selection,name:base.selection__res_company__base_onboarding_company_state__done
 msgid "Done"
-msgstr ""
+msgstr "সম্পন্ন"
 
 #. module: base
 #: model:res.partner.title,shortcut:base.res_partner_title_doctor
@@ -11576,7 +11589,7 @@ msgstr ""
 #. module: base
 #: model:ir.model.fields,field_description:base.field_ir_demo_failure__error
 msgid "Error"
-msgstr ""
+msgstr "ত্রুটি"
 
 #. module: base
 #: code:addons/base/models/ir_ui_view.py:0
@@ -13337,7 +13350,7 @@ msgstr ""
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.wizard_lang_export
 msgid "Here is the exported translation file:"
-msgstr ""
+msgstr "রফতানি করার জন্যে অনুবাদ ফাইলটি এখানে:"
 
 #. module: base
 #: code:addons/base/models/ir_qweb_fields.py:0
@@ -16589,7 +16602,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:base.view_partner_simple_form
 #: model_terms:ir.ui.view,arch_db:base.view_partner_tree
 msgid "Name"
-msgstr ""
+msgstr "নাম"
 
 #. module: base
 #: model_terms:ir.ui.view,arch_db:base.report_irmodeloverview
@@ -21427,17 +21440,6 @@ msgid "Somalia"
 msgstr ""
 
 #. module: base
-#: code:addons/models.py:0
-#, python-format
-msgid ""
-"Some records are incompatible with the company of the %(document_descr)s.\n"
-"\n"
-"Incompatibilities:\n"
-"Fields: %(fields)s\n"
-"Record ids: %(records)s\n"
-msgstr ""
-
-#. module: base
 #: model:ir.model.fields,help:base.field_res_bank__bic
 #: model:ir.model.fields,help:base.field_res_partner_bank__bank_bic
 msgid "Sometimes called BIC or Swift."
@@ -21998,7 +22000,7 @@ msgstr ""
 #. module: base
 #: model:ir.model.fields.selection,name:base.selection__ir_mail_server__smtp_encryption__starttls
 msgid "TLS (STARTTLS)"
-msgstr ""
+msgstr "টিএলএস (STARTTLS)"
 
 #. module: base
 #: model:ir.model.fields.selection,name:base.selection__report_paperformat__format__tabloid
@@ -23944,7 +23946,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:base.view_users_simple_form
 #: model_terms:ir.ui.view,arch_db:base.view_users_tree
 msgid "Users"
-msgstr ""
+msgstr "ব্যবহারকারীরা"
 
 #. module: base
 #: model:ir.ui.menu,name:base.menu_users
@@ -24361,7 +24363,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:base.user_groups_view
 #: model_terms:ir.ui.view,arch_db:base.view_company_form
 msgid "Website"
-msgstr ""
+msgstr "ওয়েবসাইট"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_website_sale_management
@@ -25258,7 +25260,7 @@ msgstr ""
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_snailmail_account
 msgid "snailmail_account"
-msgstr ""
+msgstr "স্নাইলমাইল_একাউন্ট"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_test_mimetypes
