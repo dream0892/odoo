@@ -107,7 +107,7 @@ class MaintenanceEquipment(models.Model):
             equipment_ids = self._search([('name', '=', name)] + args, limit=limit, access_rights_uid=name_get_uid)
         if not equipment_ids:
             equipment_ids = self._search([('name', operator, name)] + args, limit=limit, access_rights_uid=name_get_uid)
-        return models.lazy_name_get(self.browse(equipment_ids).with_user(name_get_uid))
+        return equipment_ids
 
     name = fields.Char('Equipment Name', required=True, translate=True)
     company_id = fields.Many2one('res.company', string='Company',
@@ -176,7 +176,7 @@ class MaintenanceEquipment(models.Model):
                 if next_date < date_now:
                     next_date = date_now
             else:
-                next_date = self.effective_date + timedelta(days=equipment.period)
+                next_date = equipment.effective_date + timedelta(days=equipment.period)
             equipment.next_action_date = next_date
         (self - equipments).next_action_date = False
 
@@ -223,7 +223,7 @@ class MaintenanceEquipment(models.Model):
     def _create_new_request(self, date):
         self.ensure_one()
         self.env['maintenance.request'].create({
-            'name': _('Preventive Maintenance - %s') % self.name,
+            'name': _('Preventive Maintenance - %s', self.name),
             'request_date': date,
             'schedule_date': date,
             'category_id': self.category_id.id,

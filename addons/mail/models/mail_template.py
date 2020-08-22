@@ -74,7 +74,7 @@ class MailTemplate(models.Model):
     @api.returns('self', lambda value: value.id)
     def copy(self, default=None):
         default = dict(default or {},
-                       name=_("%s (copy)") % self.name)
+                       name=_("%s (copy)", self.name))
         return super(MailTemplate, self).copy(default=default)
 
     def unlink_action(self):
@@ -88,7 +88,7 @@ class MailTemplate(models.Model):
         view = self.env.ref('mail.email_compose_message_wizard_form')
 
         for template in self:
-            button_name = _('Send Mail (%s)') % template.name
+            button_name = _('Send Mail (%s)', template.name)
             action = ActWindow.create({
                 'name': button_name,
                 'type': 'ir.actions.act_window',
@@ -196,11 +196,11 @@ class MailTemplate(models.Model):
                     report_service = report.report_name
 
                     if report.report_type in ['qweb-html', 'qweb-pdf']:
-                        result, format = report.render_qweb_pdf([res_id])
+                        result, format = report._render_qweb_pdf([res_id])
                     else:
-                        res = report.render([res_id])
+                        res = report._render([res_id])
                         if not res:
-                            raise UserError(_('Unsupported report type %s found.') % report.report_type)
+                            raise UserError(_('Unsupported report type %s found.', report.report_type))
                         result, format = res
 
                     # TODO in trunk, change return format to binary to match message_post expected format
@@ -267,7 +267,7 @@ class MailTemplate(models.Model):
                     'company': 'company_id' in record and record['company_id'] or self.env.company,
                     'record': record,
                 }
-                body = template.render(template_ctx, engine='ir.qweb', minimal_qcontext=True)
+                body = template._render(template_ctx, engine='ir.qweb', minimal_qcontext=True)
                 values['body_html'] = self.env['mail.render.mixin']._replace_local_links(body)
         mail = self.env['mail.mail'].sudo().create(values)
 

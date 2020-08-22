@@ -17,9 +17,6 @@
             padding: $o-kanban-inside-vgutter $o-kanban-inside-hgutter-mobile;
         }
         &:focus, &:focus-within {
-            -webkit-box-shadow: 1px 1px 1px 0px gray('600');
-            -moz-box-shadow: 1px 1px 1px 0px gray('600');
-            box-shadow: 1px 1px 1px 0px gray('600');
             z-index: 1; // show the shadow on top of the previous & next cards in grouped mode
             outline: none;
         }
@@ -40,6 +37,12 @@
         &.o_disabled {
             pointer-events: none;
             opacity: 0.7;
+        }
+
+        &:focus, &:focus-within {
+            -webkit-box-shadow: 1px 1px 1px 0px gray('600');
+            -moz-box-shadow: 1px 1px 1px 0px gray('600');
+            box-shadow: 1px 1px 1px 0px gray('600');
         }
     }
 
@@ -261,6 +264,7 @@
             display: block;
             margin-bottom: $o-kanban-inner-hmargin;
             line-height: 1.2;
+            word-break: break-all;
 
             .o_tag {
                 display: inline-block;
@@ -313,6 +317,11 @@
         // Kanban Record - Utility classes
         &.oe_kanban_global_click, &.oe_kanban_global_click_edit {
             cursor: pointer;
+            &:focus, &:focus-within {
+                -webkit-box-shadow: 1px 1px 1px 0px gray('600');
+                -moz-box-shadow: 1px 1px 1px 0px gray('600');
+                box-shadow: 1px 1px 1px 0px gray('600');
+            }
         }
 
         &.ui-sortable-helper {
@@ -450,6 +459,9 @@
             .o_kanban_config {
                 visibility: hidden;
 
+                > .dropdown-menu {
+                    cursor: default;
+                }
                 i {
                     @include o-kanban-icon;
                 }
@@ -479,7 +491,7 @@
         }
     }
 
-    &.ui-sortable .o_kanban_header_title {
+    &.ui-sortable .o_kanban_header_title .o_column_title {
         cursor: move;
     }
 

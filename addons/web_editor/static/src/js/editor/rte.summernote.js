@@ -9,10 +9,9 @@ var core = require('web.core');
 // the bus by summernote in an iframe will be caught by the wysiwyg's SummernoteManager
 // outside the iframe.
 const topBus = window.top.odoo.__DEBUG__.services['web.core'].bus;
-const ColorpickerDialog = require('web.ColorpickerDialog');
+const {ColorpickerWidget} = require('web.Colorpicker');
 var ColorPaletteWidget = require('web_editor.ColorPalette').ColorPaletteWidget;
 var mixins = require('web.mixins');
-const session = require('web.session');
 var fonts = require('wysiwyg.fonts');
 var rte = require('web_editor.rte');
 var ServicesMixin = require('web.ServicesMixin');
@@ -30,11 +29,15 @@ var tplButton = renderer.getTemplate().button;
 var tplIconButton = renderer.getTemplate().iconButton;
 var tplDropdown = renderer.getTemplate().dropdown;
 
-var applyColor = function (target, eventName, color) {
+const processAndApplyColor = function (target, eventName, color, preview) {
+    if (!color) {
+        color = 'inherit';
+    } else if (!ColorpickerWidget.isCSSColor(color)) {
+        color = (eventName === "foreColor" ? 'text-' : 'bg-') + color;
+    }
     var layoutInfo = dom.makeLayoutInfo(target);
-    $.summernote.pluginEvents[eventName](undefined, eventHandler.modules.editor, layoutInfo, color);
+    $.summernote.pluginEvents[eventName](undefined, eventHandler.modules.editor, layoutInfo, color, preview);
 };
-
 // Update and change the popovers content, and add history button
 renderer.createPalette = function ($container, options) {
     const $dropdownContent = $container.find(".colorPalette");
@@ -46,6 +49,10 @@ renderer.createPalette = function ($container, options) {
         const mutex = new concurrency.MutexedDropPrevious();
         const $dropdown = $(elem).closest('.btn-group, .dropdown');
         let manualOpening = false;
+        // Prevent dropdown closing on colorpicker click
+        $dropdown.on('hide.bs.dropdown', ev => {
+            return !(ev.clickEvent && ev.clickEvent.originalEvent && ev.clickEvent.originalEvent.__isColorpickerClick);
+        });
         $dropdown.on('show.bs.dropdown', () => {
             if (manualOpening) {
                 return true;
@@ -62,14 +69,15 @@ renderer.createPalette = function ($container, options) {
                     $editable: rte.Class.prototype.editable(), // Our parent is the root widget, we can't retrieve the editable section from it...
                     selectedColor: $(targetElement).css(eventName === "foreColor" ? 'color' : 'backgroundColor'),
                 });
-                colorpicker.on('color_picked', null, ev => {
-                    let color = ev.data.color;
-                    if (!ColorpickerDialog.isCSSColor(color)) {
-                        color = (eventName === "foreColor" ? 'text-' : 'bg-') + color;
-                    }
-                    applyColor(ev.data.target, eventName, color);
+                colorpicker.on('custom_color_picked color_picked', null, ev => {
+                    processAndApplyColor(ev.data.target, eventName, ev.data.color);
                 });
-                colorpicker.on('color_reset', null, ev => applyColor(ev.data.target, eventName, 'inherit'));
+                colorpicker.on('color_hover color_leave', null, ev => {
+                    processAndApplyColor(ev.data.target, eventName, ev.data.color, true);
+                });
+                colorpicker.on('enter_key_color_colorpicker', null, () => {
+                    $dropdown.children('.dropdown-toggle').dropdown('hide');
+                });
                 return colorpicker.replace(hookEl).then(() => {
                     if (oldColorpicker) {
                         oldColorpicker.destroy();
@@ -451,7 +459,7 @@ $.summernote.pluginEvents.alt = function (event, editor, layoutInfo, sorted) {
 $.summernote.pluginEvents.cropImage = function (event, editor, layoutInfo, sorted) {
     var $editable = layoutInfo.editable();
     var $selection = layoutInfo.handle().find('.note-control-selection');
-    topBus.trigger('crop_image_dialog_demand', {
+    topBus.trigger('crop_image_demand', {
         $editable: $editable,
         media: $selection.data('target'),
     });
@@ -1066,7 +1074,7 @@ var SummernoteManager = Class.extend(mixins.EventDispatcherMixin, ServicesMixin,
         this.setParent(parent);
 
         topBus.on('alt_dialog_demand', this, this._onAltDialogDemand);
-        topBus.on('crop_image_dialog_demand', this, this._onCropImageDialogDemand);
+        topBus.on('crop_image_demand', this, this._onCropImageDemand);
         topBus.on('link_dialog_demand', this, this._onLinkDialogDemand);
         topBus.on('media_dialog_demand', this, this._onMediaDialogDemand);
     },
@@ -1077,57 +1085,42 @@ var SummernoteManager = Class.extend(mixins.EventDispatcherMixin, ServicesMixin,
         mixins.EventDispatcherMixin.destroy.call(this);
 
         topBus.off('alt_dialog_demand', this, this._onAltDialogDemand);
-        topBus.off('crop_image_dialog_demand', this, this._onCropImageDialogDemand);
+        topBus.off('crop_image_demand', this, this._onCropImageDemand);
         topBus.off('link_dialog_demand', this, this._onLinkDialogDemand);
         topBus.off('media_dialog_demand', this, this._onMediaDialogDemand);
     },
 
     /**
-     * Create/Update cropped attachments.
+     * Create modified image attachments.
      *
      * @param {jQuery} $editable
      * @returns {Promise}
      */
-    saveCroppedImages: function ($editable) {
-        var defs = _.map($editable.find('.o_cropped_img_to_save'), async croppedImg => {
-            var $croppedImg = $(croppedImg);
-            $croppedImg.removeClass('o_cropped_img_to_save');
-
-            var resModel = $croppedImg.data('crop:resModel');
-            var resID = $croppedImg.data('crop:resID');
-            var cropID = $croppedImg.data('crop:id');
-            var mimetype = $croppedImg.data('crop:mimetype');
-            var originalSrc = $croppedImg.data('crop:originalSrc');
-
-            var datas = $croppedImg.attr('src').split(',')[1];
-            let attachmentID = cropID;
-            if (!cropID) {
-                var name = originalSrc + '.crop';
-                attachmentID = await this._rpc({
-                    model: 'ir.attachment',
-                    method: 'create',
-                    args: [{
+    saveModifiedImages: function ($editable) {
+        const defs = _.map($editable, async editableEl => {
+            const {oeModel: resModel, oeId: resId} = editableEl.dataset;
+            const proms = [...editableEl.querySelectorAll('.o_modified_image_to_save')].map(async el => {
+                const isBackground = !el.matches('img');
+                el.classList.remove('o_modified_image_to_save');
+                // Modifying an image always creates a copy of the original, even if
+                // it was modified previously, as the other modified image may be used
+                // elsewhere if the snippet was duplicated or was saved as a custom one.
+                const newAttachmentSrc = await this._rpc({
+                    route: `/web_editor/modify_image/${el.dataset.originalId}`,
+                    params: {
                         res_model: resModel,
-                        res_id: resID,
-                        name: name,
-                        datas: datas,
-                        mimetype: mimetype,
-                        url: originalSrc, // To save the original image that was cropped
-                    }],
+                        res_id: parseInt(resId),
+                        data: (isBackground ? el.dataset.bgSrc : el.getAttribute('src')).split(',')[1],
+                    },
                 });
-            } else {
-                await this._rpc({
-                    model: 'ir.attachment',
-                    method: 'write',
-                    args: [[cropID], {datas: datas}],
-                });
-            }
-            const access_token = await this._rpc({
-                model: 'ir.attachment',
-                method: 'generate_access_token',
-                args: [[attachmentID]],
+                if (isBackground) {
+                    $(el).css('background-image', `url('${newAttachmentSrc}')`);
+                    delete el.dataset.bgSrc;
+                } else {
+                    el.setAttribute('src', newAttachmentSrc);
+                }
             });
-            $croppedImg.attr('src', '/web/image/' + attachmentID + '?access_token=' + access_token[0]);
+            return Promise.all(proms);
         });
         return Promise.all(defs);
     },
@@ -1160,30 +1153,18 @@ var SummernoteManager = Class.extend(mixins.EventDispatcherMixin, ServicesMixin,
         altDialog.open();
     },
     /**
-     * Called when a demand to open a crop dialog is received on the bus.
+     * Called when a demand to crop an image is received on the bus.
      *
      * @private
      * @param {Object} data
      */
-    _onCropImageDialogDemand: function (data) {
+    _onCropImageDemand: function (data) {
         if (data.__alreadyDone) {
             return;
         }
         data.__alreadyDone = true;
-        var cropImageDialog = new weWidgets.CropImageDialog(this,
-            _.extend({
-                res_model: data.$editable.data('oe-model'),
-                res_id: data.$editable.data('oe-id'),
-            }, data.options || {}),
-            data.media
-        );
-        if (data.onSave) {
-            cropImageDialog.on('save', this, data.onSave);
-        }
-        if (data.onCancel) {
-            cropImageDialog.on('cancel', this, data.onCancel);
-        }
-        cropImageDialog.open();
+        new weWidgets.ImageCropWidget(this, data.media)
+            .appendTo(data.$editable);
     },
     /**
      * Called when a demand to open a link dialog is received on the bus.

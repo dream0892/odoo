@@ -76,7 +76,7 @@ publicWidget.registry.websiteBlog = publicWidget.Widget.extend({
         } else if ($element.hasClass('o_facebook')) {
             url = 'https://www.facebook.com/sharer/sharer.php?u=' + articleURL;
         } else if ($element.hasClass('o_linkedin')) {
-            url = 'https://www.linkedin.com/shareArticle?mini=true&url=' + articleURL + '&title=' + blogPostTitle;
+            url = 'https://www.linkedin.com/sharing/share-offsite/?url=' + articleURL;
         }
         window.open(url, '', 'menubar=no, width=500, height=400');
     },
@@ -92,8 +92,8 @@ publicWidget.registry.websiteBlog = publicWidget.Widget.extend({
      * @param {Function} callback - to be executed after the scroll is performed
      */
     _forumScrollAction: function ($el, duration, callback) {
-        var $mainNav = $('#wrapwrap > header');
-        var gap = $mainNav.height() + $mainNav.offset().top;
+        const $main = $('#wrapwrap > main');
+        var gap = $main.offset().top + parseInt($main.css('padding-top'));
 
         $('html, body').stop().animate({
             scrollTop: $el.offset().top - gap

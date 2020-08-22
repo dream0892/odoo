@@ -62,9 +62,8 @@
                             class="o_group_by_menu"
                             fields="fields"
                         />
-                        <TimeRangeMenu t-if="props.searchMenuTypes.includes('timeRange')"
-                            class="o_time_range_menu"
-                            fields="fields"
+                        <ComparisonMenu t-if="props.searchMenuTypes.includes('comparison') and model.get('filters', f => f.type === 'comparison').length"
+                            class="o_comparison_menu"
                         />
                         <FavoriteMenu t-if="props.searchMenuTypes.includes('favorite')"
                             class="o_favorite_menu"
@@ -160,7 +159,7 @@
             t-on-click="state.open = !state.open"
             t-on-keydown="_onButtonKeydown"
             >
-            <i t-if="props.icon" t-att-class="props.icon"/>
+            <i t-if="icon" t-att-class="icon"/>
             <span class="o_dropdown_title" t-esc="title"/>
             <i t-if="displayCaret" t-attf-class="o_dropdown_caret fa fa-caret-{{ state.open ? 'down' : 'right' }}"/>
             <i t-elif="displayChevron" t-attf-class="fa fa-chevron-{{ state.open ? 'down' : 'right' }} float-right mt4"/>
@@ -216,18 +215,6 @@
             <li t-if="items.length" class="dropdown-divider" role="separator"/>
             <CustomGroupByItem fields="fields"/>
         </t>
-    </xpath>
-</t>
-
-<t t-name="web.TimeRangeMenu" t-inherit="web.DropdownMenu" t-inherit-mode="primary" owl="1">
-    <xpath expr="//ul[@role='menu']/t[@t-foreach]" position="replace">
-        <li class="o_menu_item dropdown-item-text" role="menuitem">
-            <t t-if="fields.length" t-call="web.TimeRangeEditor"/>
-            <t t-else="">No date field available.</t>
-        </li>
-        <li class="o_menu_item dropdown-item-text" role="menuitem">
-            <button type="button" class="btn btn-primary" t-on-click="_onApply">Apply</button>
-        </li>
     </xpath>
 </t>
 
@@ -474,12 +461,13 @@
 <t t-name="web.OwlDialog" owl="1">
     <Portal target="'body'">
         <div class="o_dialog" t-on-focus="_onFocus" t-on-click="_onClick">
-            <div t-if="props.backdrop" class="modal-backdrop show" t-on-click="_onBackdropClick"/>
             <div role="dialog" class="modal"
                 tabindex="-1"
                 t-att-class="{ o_technical_modal: props.technical, o_modal_full: props.fullscreen }"
+                t-att-data-backdrop="'' + props.backdrop"
                 t-ref="modal"
                 t-on-close_dialog.stop="_close"
+                t-on-click="_onBackdropClick"
                 >
                 <div class="modal-dialog" t-att-class="size">
                     <div class="modal-content" t-att-class="props.contentClass">
@@ -508,7 +496,7 @@
 </t>
 
 <t t-name="Popover" owl="1">
-    <div t-on-click="openPopover" data-popover="1">
+    <div t-att-class="{ 'o_is_open': state.displayed }" t-on-click="_onClick" t-on-o-popover-close="_onPopoverClose">
         <t t-slot="default"/>
         <Portal t-if="state.displayed" target="'body'">
             <div role="tooltip" class="o_popover" t-ref="popover">
@@ -567,15 +555,15 @@
 
 <t t-name="web.SearchBar" owl="1">
     <div class="o_searchview_input_container">
-        <div t-foreach="model.getFacets()" t-as="facet" t-key="facet_index"
+        <div t-foreach="model.get('facets')" t-as="facet" t-key="facet_index"
             tabindex="0"
             class="o_searchview_facet"
             role="img"
             aria-label="search"
             t-on-keydown="_onFacetKeydown(facet, facet_index)"
             >
-            <span t-if="facet.title" class="o_searchview_facet_label" t-esc="facet.title"/>
-            <span t-else="" t-attf-class="o_searchview_facet_label fa {{ facet.icon }}"/>
+            <span t-if="facet.icon" t-attf-class="o_searchview_facet_label {{ facet.icon }}"/>
+            <span t-else="" class="o_searchview_facet_label" t-esc="facet.title"/>
             <div class="o_facet_values">
                 <t t-foreach="facet.values" t-as="facetValue" t-key="facetValue_index">
                     <span t-if="!facetValue_first" class="o_facet_values_sep" t-esc="facet.separator"/>
@@ -616,7 +604,7 @@
                 </a>
                 <a href="#" t-on-click.prevent="">
                     <t t-if="src.label" t-esc="src.label"/>
-                    <t t-elif="['date', 'datetime'].includes(props.fields[src.fieldName].type)">
+                    <t t-elif="['date', 'datetime'].includes(src.type)">
                         <t>Search <em t-esc="src.description"/> at: <strong t-esc="state.inputValue"/></t>
                     </t>
                     <t t-else="">Search <em t-esc="src.description"/> for: <strong t-esc="state.inputValue"/></t>
@@ -637,53 +625,8 @@
             title="env._t('Action')"
             items="actionItems"
             icon="'fa fa-cog'"
+            closeOnSelected="true"
         />
-    </div>
-</t>
-
-<t t-name="web.TimeRangeEditor" owl="1">
-    <div class="o_time_range_editor">
-        <div class="o_time_range_section">
-            <label t-attf-for="field_select_{{ domId }}">Based On</label>
-            <select t-attf-id="field_select_{{ domId }}" class="o_input" t-model="state.fieldName">
-                <option t-foreach="fields" t-as="field" t-key="field.name"
-                    t-att-selected="state.fieldName === field.name"
-                    t-att-value="field.name"
-                    t-esc="field.description"
-                />
-            </select>
-        </div>
-        <div class="o_time_range_section">
-            <label t-attf-for="range_select_{{ domId }}">Range</label>
-            <select t-attf-id="range_select_{{ domId }}" class="o_input" t-model="state.rangeId">
-                <optgroup t-foreach="periodGroups" t-as="group" t-key="group" label="">
-                    <t t-foreach="Object.values(periodOptions)" t-as="option" t-key="option_index">
-                        <option t-if="option.groupNumber === group"
-                            t-att-selected="state.rangeId === option.id"
-                            t-att-value="option.id"
-                            t-esc="option.description"
-                        />
-                    </t>
-                </optgroup>
-            </select>
-        </div>
-        <div class="o_time_range_section">
-            <div class="custom-control custom-checkbox">
-                <input type="checkbox" t-attf-id="checkbox_select_{{ domId }}"
-                    class="custom-control-input"
-                    t-att-checked="state.comparisonRangeId"
-                    t-on-click="_onCheckboxClick"
-                />
-                <label t-attf-for="checkbox_select_{{ domId }}" class="custom-control-label">Compare To</label>
-            </div>
-            <select t-if="state.comparisonRangeId" class="o_input" t-model="state.comparisonRangeId">
-                <option t-foreach="Object.values(comparisonTimeRangeOptions)" t-as="option" t-key="option_index"
-                    t-att-selected="state.comparisonRangeId === option.id"
-                    t-att-value="option.id"
-                    t-esc="option.description"
-                />
-            </select>
-        </div>
     </div>
 </t>
 
@@ -710,8 +653,8 @@
     <div class="oe_tooltip_string" t-if="widget.string" role="tooltip">
         <t t-esc="widget.string"/> <t t-if="debug and widget.nolabel">(nolabel)</t>
     </div>
-    <p t-if="widget.attrs.help || widget.field.help" class="oe_tooltip_help" role="tooltip">
-        <t t-esc="widget.attrs.help || widget.field.help"/>
+    <p t-if="help" class="oe_tooltip_help" role="tooltip">
+        <t t-esc="help"/>
     </p>
     <ul t-if="debug" class="oe_tooltip_technical" role="tooltip">
         <li data-item="field" t-if="widget.name">
@@ -860,17 +803,9 @@
     </div>
 </div>
 
-<div t-name="View.NoContentHelper" class="o_view_nocontent" role="alert">
+<div t-name="web.ActionHelper" class="o_view_nocontent" owl="1">
     <div class="o_nocontent_help">
-        <p class="o_view_nocontent_empty_folder">
-            <t t-if="title" t-esc="title"/>
-            <t t-else="1">No data to display</t>
-        </p>
-        <p>
-            <t t-if="description" t-esc="description"/>
-            <t t-else="1">Try to add some records, or make sure that there is no
-                active filter in the search bar.</t>
-        </p>
+        <t t-raw="noContentHelp"/>
     </div>
 </div>
 
@@ -1045,6 +980,10 @@
     </div>
     <div class="btn-group" role="toolbar" aria-label="Change graph">
         <button class="btn btn-secondary fa fa-database o_graph_button" title="Stacked" aria-label="Stacked" data-mode="stack"/>
+    </div>
+    <div class="btn-group" role="toolbar" aria-label="Sort graph">
+        <button class="btn btn-secondary fa fa-sort-amount-desc o_graph_button" title="Descending" aria-label="Descending" data-order="desc"/>
+        <button class="btn btn-secondary fa fa-sort-amount-asc o_graph_button" title="Ascending" aria-label="Ascending" data-order="asc"/>
     </div>
 </t>
 
@@ -1300,7 +1239,8 @@
             class="o_datepicker_input o_input datetimepicker-input"
             t-att-name="widget.name"
             t-att-placeholder="placeholder"
-            t-attf-data-target="##{datepickerID}"/>
+            t-attf-data-target="##{datepickerID}"
+            autocomplete="off"/>
         <span class="o_datepicker_button"/>
     </div>
 </t>

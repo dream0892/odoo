@@ -19,7 +19,7 @@ import odoo
 from odoo import http, models, fields, _
 from odoo.http import request
 from odoo.tools import OrderedSet
-from odoo.addons.http_routing.models.ir_http import slug, _guess_mimetype
+from odoo.addons.http_routing.models.ir_http import slug, slugify, _guess_mimetype
 from odoo.addons.web.controllers.main import Binary
 from odoo.addons.portal.controllers.portal import pager as portal_pager
 from odoo.addons.portal.controllers.web import Home
@@ -95,16 +95,21 @@ class Website(Home):
     # while portal users are redirected to the frontend by default
     # ------------------------------------------------------
 
-    @http.route(website=True, auth="public", sitemap=False)
-    def web_login(self, redirect=None, *args, **kw):
-        response = super(Website, self).web_login(redirect=redirect, *args, **kw)
+    def _login_redirect(self, uid, redirect=None):
+        """ Redirect regular users (employees) to the backend) and others to
+        the frontend
+        """
         if not redirect and request.params['login_success']:
-            if request.env['res.users'].browse(request.uid).has_group('base.group_user'):
+            if request.env['res.users'].browse(uid).has_group('base.group_user'):
                 redirect = b'/web?' + request.httprequest.query_string
             else:
                 redirect = '/my'
-            return http.redirect_with_hash(redirect)
-        return response
+        return super()._login_redirect(uid, redirect=redirect)
+
+    # Force website=True + auth='public', required for login form layout
+    @http.route(website=True, auth="public", sitemap=False)
+    def web_login(self, *args, **kw):
+        return super().web_login(*args, **kw)
 
     # ------------------------------------------------------
     # Business
@@ -167,15 +172,15 @@ class Website(Home):
             sitemaps.unlink()
 
             pages = 0
-            locs = request.website.with_user(request.website.user_id).enumerate_pages()
+            locs = request.website.with_user(request.website.user_id)._enumerate_pages()
             while True:
                 values = {
                     'locs': islice(locs, 0, LOC_PER_SITEMAP),
                     'url_root': request.httprequest.url_root[:-1],
                 }
-                urls = View.render_template('website.sitemap_locs', values)
+                urls = View._render_template('website.sitemap_locs', values)
                 if urls.strip():
-                    content = View.render_template('website.sitemap_xml', {'content': urls})
+                    content = View._render_template('website.sitemap_xml', {'content': urls})
                     pages += 1
                     last_sitemap = create_sitemap('/sitemap-%d-%d.xml' % (current_website.id, pages), content)
                 else:
@@ -194,7 +199,7 @@ class Website(Home):
                 pages_with_website = ["%d-%d" % (current_website.id, p) for p in range(1, pages + 1)]
 
                 # Sitemaps must be split in several smaller files with a sitemap index
-                content = View.render_template('website.sitemap_index_xml', {
+                content = View._render_template('website.sitemap_index_xml', {
                     'pages': pages_with_website,
                     'url_root': request.httprequest.url_root,
                 })
@@ -238,7 +243,7 @@ class Website(Home):
         matching_urls = set(map(lambda match: match['value'], matching_pages))
 
         matching_last_modified = []
-        last_modified_pages = current_website.get_website_pages(order='write_date desc', limit=5)
+        last_modified_pages = current_website._get_website_pages(order='write_date desc', limit=5)
         for url, name in last_modified_pages.mapped(lambda p: (p.url, p.name)):
             if needle.lower() in name.lower() or needle.lower() in url.lower() and url not in matching_urls:
                 matching_last_modified.append({
@@ -263,6 +268,21 @@ class Website(Home):
                 dict(title=_('Apps url'), values=suggested_controllers),
             ]
         }
+
+    @http.route('/website/snippet/filters', type='json', auth='public', website=True)
+    def get_dynamic_filter(self, filter_id, template_key, limit=None, search_domain=None):
+        dynamic_filter = request.env['website.snippet.filter'].sudo().search(
+            [('id', '=', filter_id)] + request.website.website_domain()
+        )
+        return dynamic_filter and dynamic_filter.render(template_key, limit, search_domain) or ''
+
+    @http.route('/website/snippet/filter_templates', type='json', auth='public', website=True)
+    def get_dynamic_snippet_templates(self, filter_id=False):
+        # todo: if filter_id.model -> filter template
+        templates = request.env['ir.ui.view'].sudo().search_read(
+            [['key', 'ilike', '.dynamic_filter_template_'], ['type', '=', 'qweb']], ['key', 'name']
+        )
+        return templates
 
     # ------------------------------------------------------
     # Edit
@@ -311,7 +331,7 @@ class Website(Home):
         }
         return request.render("website.list_website_pages", values)
 
-    @http.route(['/website/add/', '/website/add/<path:path>'], type='http', auth="user", website=True)
+    @http.route(['/website/add/', '/website/add/<path:path>'], type='http', auth="user", website=True, methods=['POST'])
     def pagenew(self, path="", noredirect=False, add_menu=False, template=False, **kwargs):
         # for supported mimetype, get correct default template
         _, ext = os.path.splitext(path)
@@ -340,7 +360,10 @@ class Website(Home):
 
     @http.route('/website/toggle_switchable_view', type='json', auth='user', website=True)
     def toggle_switchable_view(self, view_key):
-        request.website.viewref(view_key).toggle_active()
+        if request.website.user_has_groups('website.group_website_designer'):
+            request.website.viewref(view_key).toggle_active()
+        else:
+            return werkzeug.exceptions.Forbidden()
 
     @http.route('/website/reset_template', type='http', auth='user', methods=['POST'], website=True, csrf=False)
     def reset_template(self, view_id, mode='soft', redirect='/', **kwargs):
@@ -388,8 +411,14 @@ class Website(Home):
         fields = ['website_meta_title', 'website_meta_description', 'website_meta_keywords', 'website_meta_og_img']
         if res_model == 'website.page':
             fields.extend(['website_indexed', 'website_id'])
-        res = request.env[res_model].browse(res_id).read(fields)[0]
+
+        record = request.env[res_model].browse(res_id)
+        res = record._read_format(fields)[0]
         res['has_social_default_image'] = request.website.has_social_default_image
+
+        if res_model not in ('website.page', 'ir.ui.view') and 'seo_name' in record:  # allow custom slugify
+            res['seo_name_default'] = slugify(record.display_name)  # default slug, if seo_name become empty
+            res['seo_name'] = record.seo_name and slugify(record.seo_name) or ''
         return res
 
     @http.route(['/google<string(length=16):key>.html'], type='http', auth="public", website=True, sitemap=False)
@@ -407,6 +436,12 @@ class Website(Home):
                 raise werkzeug.exceptions.NotFound()
 
         return request.make_response("google-site-verification: %s" % request.website.google_search_console)
+
+    @http.route('/website/google_maps_api_key', type='json', auth='public', website=True)
+    def google_maps_api_key(self):
+        return json.dumps({
+            'google_maps_api_key': request.website.google_maps_api_key or ''
+        })
 
     # ------------------------------------------------------
     # Themes
@@ -465,14 +500,6 @@ class Website(Home):
         """
         request.env['web_editor.assets'].make_scss_customization(url, values)
         return True
-
-    @http.route(['/website/multi_render'], type='json', auth="public", website=True)
-    def multi_render(self, ids_or_xml_ids, values=None):
-        View = request.env['ir.ui.view']
-        res = {}
-        for id_or_xml_id in ids_or_xml_ids:
-            res[id_or_xml_id] = View.render_template(id_or_xml_id, values)
-        return res
 
     @http.route(['/website/update_visitor_timezone'], type='json', auth="public", website=True)
     def update_visitor_timezone(self, timezone):

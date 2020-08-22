@@ -105,6 +105,10 @@ class StockMove(models.Model):
         rslt += self.mapped('picking_id.purchase_id.invoice_ids').filtered(lambda x: x.state == 'posted')
         return rslt
 
+    def _get_source_document(self):
+        res = super()._get_source_document()
+        return self.purchase_line_id.order_id or res
+
 
 class StockWarehouse(models.Model):
     _inherit = 'stock.warehouse'
@@ -140,6 +144,17 @@ class StockWarehouse(models.Model):
     def _get_all_routes(self):
         routes = super(StockWarehouse, self)._get_all_routes()
         routes |= self.filtered(lambda self: self.buy_to_resupply and self.buy_pull_id and self.buy_pull_id.route_id).mapped('buy_pull_id').mapped('route_id')
+        return routes
+
+    def get_rules_dict(self):
+        result = super(StockWarehouse, self).get_rules_dict()
+        for warehouse in self:
+            result[warehouse.id].update(warehouse._get_receive_rules_dict())
+        return result
+
+    def _get_routes_values(self):
+        routes = super(StockWarehouse, self)._get_routes_values()
+        routes.update(self._get_receive_routes_values('buy_to_resupply'))
         return routes
 
     def _update_name_and_code(self, name=False, code=False):
@@ -254,7 +269,7 @@ class ProductionLot(models.Model):
 
     def action_view_po(self):
         self.ensure_one()
-        action = self.env.ref('purchase.purchase_form_action').read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id("purchase.purchase_form_action")
         action['domain'] = [('id', 'in', self.mapped('purchase_order_ids.id'))]
         action['context'] = dict(self._context, create=False)
         return action

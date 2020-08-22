@@ -9,7 +9,7 @@ from lxml import etree
 from lxml.builder import E
 from psycopg2 import IntegrityError
 
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import common
 from odoo.tools import mute_logger, view_validation
 from odoo.addons.base.models.ir_ui_view import (
@@ -903,6 +903,27 @@ class TestTemplating(ViewCase):
             )
         )
 
+    def test_branding_attribute_groups(self):
+        view = self.View.create({
+            'name': "Base View",
+            'type': 'qweb',
+            'arch': """<root>
+                <item groups="base.group_no_one"/>
+            </root>""",
+        })
+
+        arch_string = view.with_context(inherit_branding=True).read_combined(['arch'])['arch']
+        arch = etree.fromstring(arch_string)
+        self.View.distribute_branding(arch)
+
+        self.assertEqual(arch, E.root(E.item({
+            'groups': 'base.group_no_one',
+            'data-oe-model': 'ir.ui.view',
+            'data-oe-id': str(view.id),
+            'data-oe-field': 'arch',
+            'data-oe-xpath': '/root[1]/item[1]',
+        })))
+
     def test_call_no_branding(self):
         view = self.View.create({
             'name': "Base View",
@@ -1492,7 +1513,7 @@ class TestViews(ViewCase):
                     <field name="inherit_id" domain="[('invalid_field', '=', 'res.users')]"/>
                 </form>
             """,
-            '''Unknow field "ir.ui.view.invalid_field" in domain of <field name="inherit_id"> "[('invalid_field', '=', 'res.users')]"''',
+            '''Unknown field "ir.ui.view.invalid_field" in domain of <field name="inherit_id"> "[('invalid_field', '=', 'res.users')]"''',
         )
 
     def test_domain_field_searchable(self):
@@ -1516,7 +1537,7 @@ class TestViews(ViewCase):
             <form string="View">
                 <field name="name" domain="[('test', '=', 'test')]"/>
             </form>
-        """, "Domain on field without comodel makes no sense for \"name\" (domain:[('test', '=', 'test')])")
+        """, "Domain on non-relational field \"name\" makes no sense (domain:[('test', '=', 'test')])")
 
     @mute_logger('odoo.addons.base.models.ir_ui_view')
     def test_domain_in_subview(self):
@@ -1774,7 +1795,7 @@ class TestViews(ViewCase):
         self.assertValid(arch % 'True')
         self.assertInvalid(
             arch % "[('model', '=', '1')]",
-            "Attribute readonly evaluation must give a boolean, got [('model', '=', '1')]",
+            "Attribute readonly evaluation expects a boolean, got [('model', '=', '1')]",
         )
 
     @mute_logger('odoo.addons.base.models.ir_ui_view')
@@ -1793,11 +1814,11 @@ class TestViews(ViewCase):
         )
         self.assertInvalid(
             arch % ('name', 'invalid_field'),
-            """Unknow field "ir.ui.view.invalid_field" in domain of <filter name="draft"> "[('invalid_field', '=', 'dummy')]""",
+            """Unknown field "ir.ui.view.invalid_field" in domain of <filter name="draft"> "[('invalid_field', '=', 'dummy')]""",
         )
         self.assertInvalid(
             arch % ('name', 'inherit_children_ids.invalid_field'),
-            """Unknow field "ir.ui.view.invalid_field" in domain of <filter name="draft"> "[('inherit_children_ids.invalid_field', '=', 'dummy')]""",
+            """Unknown field "ir.ui.view.invalid_field" in domain of <filter name="draft"> "[('inherit_children_ids.invalid_field', '=', 'dummy')]""",
         )
         # todo add check for non searchable fields and group by
 
@@ -1811,7 +1832,7 @@ class TestViews(ViewCase):
         self.assertValid(arch % 'name')
         self.assertInvalid(
             arch % 'invalid_field',
-            """Unknow field "invalid_field" in "group_by" value in context="{'group_by':'invalid_field'}""",
+            """Unknown field "invalid_field" in "group_by" value in context="{'group_by':'invalid_field'}""",
         )
 
     @mute_logger('odoo.addons.base.models.ir_ui_view')
@@ -1832,7 +1853,7 @@ class TestViews(ViewCase):
                 %s
                 <searchpanel>
                     %s
-                    <field select="multi" name="groups_id" domain="[['%s', '=', %s]]"/>
+                    <field name="groups_id" select="multi" domain="[['%s', '=', %s]]" enable_counters="1"/>
                 </searchpanel>
             </search>
         """
@@ -1847,7 +1868,7 @@ class TestViews(ViewCase):
         )
         self.assertInvalid(
             arch % ('', '<field name="inherit_id"/>', 'inherit_id', 'inherit_id'),
-            """Unknow field "res.groups.inherit_id" in domain of <field name="groups_id"> "[['inherit_id', '=', inherit_id]]""",
+            """Unknown field "res.groups.inherit_id" in domain of <field name="groups_id"> "[['inherit_id', '=', inherit_id]]""",
         )
         self.assertInvalid(
             arch % ('', '<field name="inherit_id" select="multi"/>', 'view_access', 'inherit_id'),
@@ -1857,14 +1878,14 @@ class TestViews(ViewCase):
         arch = """
             <search>
                 <searchpanel>
-                    <field name="inherit_id"/>
+                    <field name="inherit_id" enable_counters="1"/>
                 </searchpanel>
                 <searchpanel>
-                    <field name="inherit_id"/>
+                    <field name="inherit_id" enable_counters="1"/>
                 </searchpanel>
             </search>
         """
-        self.assertInvalid(arch, "Search tag can only contains one search panel")
+        self.assertInvalid(arch, "Search tag can only contain one search panel")
 
     def test_groups_field(self):
         arch = """
@@ -2014,7 +2035,7 @@ class TestViews(ViewCase):
             </tree>
         """
         self.assertValid(arch % '')
-        self.assertInvalid(arch % '<group/>', "Tree child can only be have one of field, button, control, groupby, widget tag (not group)")
+        self.assertInvalid(arch % '<group/>', "Tree child can only have one of field, button, control, groupby, widget, header tag (not group)")
 
     @mute_logger('odoo.addons.base.models.ir_ui_view')
     def test_tree_groupby(self):
@@ -2027,8 +2048,8 @@ class TestViews(ViewCase):
             </tree>
         """
         self.assertValid(arch % ('model_data_id'))
-        self.assertInvalid(arch % ('type'), "field 'type' found in 'groupby' node can only be of type many2one, found selection")
-        self.assertInvalid(arch % ('dummy'), "field 'dummy' found in 'groupby' node does not exist in model ir.ui.view")
+        self.assertInvalid(arch % ('type'), "Field 'type' found in 'groupby' node can only be of type many2one, found selection")
+        self.assertInvalid(arch % ('dummy'), "Field 'dummy' found in 'groupby' node does not exist in model ir.ui.view")
 
     @mute_logger('odoo.addons.base.models.ir_ui_view')
     def test_tree_groupby_many2one(self):
@@ -2109,7 +2130,7 @@ class TestViews(ViewCase):
         )
         self.assertInvalid(
             '<form><label for="model"/></form>',
-            "Name 'model' used in 'label for' must be present in view but is missing.",
+            "Name or id 'model' used in 'label for' must be present in view but is missing.",
         )
 
     def test_col_colspan_numerical(self):
@@ -2855,8 +2876,8 @@ class TestQWebRender(ViewCase):
         })
 
         # render view and child view with an id
-        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id]).render(view1.id)
-        content2 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id]).render(view2.id)
+        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id])._render(view1.id)
+        content2 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id])._render(view2.id)
 
         self.assertEqual(content1, content2)
 
@@ -2866,14 +2887,14 @@ class TestQWebRender(ViewCase):
         self.env.cr.execute("INSERT INTO ir_model_data(name, model, res_id, module)"
                             "VALUES ('dummy_ext', 'ir.ui.view', %s, 'base')" % view2.id)
 
-        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id]).render('base.dummy')
-        content2 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id]).render('base.dummy_ext')
+        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id])._render('base.dummy')
+        content2 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id])._render('base.dummy_ext')
 
         self.assertEqual(content1, content2)
 
         # render view and primary extension with an id
-        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id]).render(view1.id)
-        content3 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id]).render(view3.id)
+        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id])._render(view1.id)
+        content3 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id])._render(view3.id)
 
         self.assertNotEqual(content1, content3)
 
@@ -2881,8 +2902,8 @@ class TestQWebRender(ViewCase):
         self.env.cr.execute("INSERT INTO ir_model_data(name, model, res_id, module)"
                             "VALUES ('dummy_primary_ext', 'ir.ui.view', %s, 'base')" % view3.id)
 
-        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id]).render('base.dummy')
-        content3 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id]).render('base.dummy_primary_ext')
+        content1 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id])._render('base.dummy')
+        content3 = self.env['ir.qweb'].with_context(check_view_ids=[view1.id, view2.id, view3.id])._render('base.dummy_primary_ext')
 
         self.assertNotEqual(content1, content3)
 
@@ -2923,6 +2944,20 @@ class TestValidationTools(common.BaseCase):
             {'x', 'y', 'z'},
         )
 
+class TestAccessRights(common.TransactionCase):
+
+    @common.users('demo')
+    def test_access(self):
+        # a user can not access directly a view
+        with self.assertRaises(AccessError):
+            self.env['ir.ui.view'].search([("model", '=', "res.partner"), ('type', '=', 'form')])
+
+        # but can call fields_view_get
+        self.env['res.partner'].fields_view_get(view_type='form')
+
+        # unless he does not have access to the model
+        with self.assertRaises(AccessError):
+            self.env['ir.ui.view'].fields_view_get(view_type='form')
 
 @common.tagged('post_install', '-at_install', '-standard', 'migration')
 class TestAllViews(common.TransactionCase):

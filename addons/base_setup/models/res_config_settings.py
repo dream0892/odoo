@@ -19,6 +19,8 @@ class ResConfigSettings(models.TransientModel):
     module_base_import = fields.Boolean("Allow users to import data from CSV/XLS/XLSX/ODS files")
     module_google_calendar = fields.Boolean(
         string='Allow the users to synchronize their calendar  with Google Calendar')
+    module_microsoft_calendar = fields.Boolean(
+        string='Allow the users to synchronize their calendar with Office 365 Calendar')
     module_google_drive = fields.Boolean("Attach Google documents to any record")
     module_google_spreadsheet = fields.Boolean("Google Spreadsheet")
     module_auth_oauth = fields.Boolean("Use external authentication providers (OAuth)")
@@ -30,6 +32,7 @@ class ResConfigSettings(models.TransientModel):
     module_web_unsplash = fields.Boolean("Unsplash Image Library")
     module_partner_autocomplete = fields.Boolean("Partner Autocomplete")
     module_base_geolocalize = fields.Boolean("GeoLocalize")
+    module_google_recaptcha = fields.Boolean("reCAPTCHA: Easy on Humans, Hard on Bots")
     report_footer = fields.Text(related="company_id.report_footer", string='Custom Report Footer', help="Footer text displayed at the bottom of all reports.", readonly=False)
     group_multi_currency = fields.Boolean(string='Multi-Currencies',
             implied_group='base.group_multi_currency',
@@ -57,7 +60,7 @@ class ResConfigSettings(models.TransientModel):
         }
 
     def open_default_user(self):
-        action = self.env.ref('base.action_res_users').read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id("base.action_res_users")
         action['res_id'] = self.env.ref('base.default_user').id
         action['views'] = [[self.env.ref('base.view_users_form').id, 'form']]
         return action

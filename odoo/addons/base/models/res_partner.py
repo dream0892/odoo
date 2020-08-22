@@ -117,8 +117,7 @@ class PartnerCategory(models.Model):
             # Be sure name_search is symetric to name_get
             name = name.split(' / ')[-1]
             args = [('name', operator, name)] + args
-        partner_category_ids = self._search(args, limit=limit, access_rights_uid=name_get_uid)
-        return models.lazy_name_get(self.browse(partner_category_ids).with_user(name_get_uid))
+        return self._search(args, limit=limit, access_rights_uid=name_get_uid)
 
 
 class PartnerTitle(models.Model):
@@ -242,7 +241,7 @@ class Partner(models.Model):
         if not self._cr.fetchone():
             self._cr.execute("""CREATE INDEX res_partner_vat_index ON res_partner (regexp_replace(upper(vat), '[^A-Z0-9]+', '', 'g'))""")
 
-    @api.depends('is_company', 'name', 'parent_id.name', 'type', 'company_name')
+    @api.depends('is_company', 'name', 'parent_id.display_name', 'type', 'company_name')
     def _compute_display_name(self):
         diff = dict(show_address=None, show_address_only=None, show_email=None, html_format=None, show_vat=None)
         names = dict(self.with_context(**diff).name_get())
@@ -318,7 +317,7 @@ class Partner(models.Model):
     def copy(self, default=None):
         self.ensure_one()
         chosen_name = default.get('name') if default else ''
-        new_name = chosen_name or _('%s (copy)') % self.name
+        new_name = chosen_name or _('%s (copy)', self.name)
         default = dict(default or {}, name=new_name)
         return super(Partner, self).copy(default)
 
@@ -495,6 +494,14 @@ class Partner(models.Model):
             addr_vals = self._update_fields_values(address_fields)
             parent.update_address(addr_vals)
 
+    def _clean_website(self, website):
+        url = urls.url_parse(website)
+        if not url.scheme:
+            if not url.netloc:
+                url = url.replace(netloc=url.path, path='')
+            website = url.replace(scheme='http').to_url()
+        return website
+
     def write(self, vals):
         if vals.get('active') is False:
             # DLE: It should not be necessary to modify this to make work the ORM. The problem was just the recompute
@@ -514,6 +521,8 @@ class Partner(models.Model):
         # (this is to allow the code from res_users to write to the partner!) or
         # if setting the company_id to False (this is compatible with any user
         # company)
+        if vals.get('website'):
+            vals['website'] = self._clean_website(vals['website'])
         if vals.get('parent_id'):
             vals['company_name'] = False
         if vals.get('company_id'):
@@ -543,6 +552,8 @@ class Partner(models.Model):
         if self.env.context.get('import_file'):
             self._check_import_consistency(vals_list)
         for vals in vals_list:
+            if vals.get('website'):
+                vals['website'] = self._clean_website(vals['website'])
             if vals.get('parent_id'):
                 vals['company_name'] = False
         partners = super(Partner, self).create(vals_list)
@@ -702,6 +713,11 @@ class Partner(models.Model):
             If only an email address is received and that the regex cannot find
             a name, the name will have the email value.
             If 'force_email' key in context: must find the email address. """
+        default_type = self._context.get('default_type')
+        if default_type and default_type not in self._fields['type'].get_values(self.env):
+            context = dict(self._context)
+            context.pop('default_type')
+            self = self.with_context(context)
         name, email = self._parse_partner_name(name)
         if self._context.get('force_email') and not email:
             raise UserError(_("Couldn't create contact without email address!"))
@@ -780,15 +796,12 @@ class Partner(models.Model):
                 query += ' limit %s'
                 where_clause_params.append(limit)
             self.env.cr.execute(query, where_clause_params)
-            partner_ids = [row[0] for row in self.env.cr.fetchall()]
+            return [row[0] for row in self.env.cr.fetchall()]
 
-            if partner_ids:
-                return models.lazy_name_get(self.browse(partner_ids))
-            else:
-                return []
         return super(Partner, self)._name_search(name, args, operator=operator, limit=limit, name_get_uid=name_get_uid)
 
     @api.model
+    @api.returns('self', lambda value: value.id)
     def find_or_create(self, email, assert_valid_email=False):
         """ Find a partner with the given ``email`` or use :py:method:`~.name_create`
         to create a new one.
@@ -872,11 +885,12 @@ class Partner(models.Model):
 
     @api.model
     def view_header_get(self, view_id, view_type):
-        res = super(Partner, self).view_header_get(view_id, view_type)
-        if res: return res
-        if not self._context.get('category_id'):
-            return False
-        return _('Partners: ') + self.env['res.partner.category'].browse(self._context['category_id']).name
+        if self.env.context.get('category_id'):
+            return  _(
+                'Partners: %(category)s',
+                category=self.env['res.partner.category'].browse(self.env.context['category_id']).name,
+            )
+        return super().view_header_get(view_id, view_type)
 
     @api.model
     @api.returns('self')

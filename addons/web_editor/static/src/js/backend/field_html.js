@@ -107,7 +107,7 @@ var FieldHtml = basic_fields.DebouncedField.extend(TranslatableFieldMixin, {
             return this._super();
         }
         var _super = this._super.bind(this);
-        return this.wysiwyg.saveCroppedImages(this.$content).then(function () {
+        return this.wysiwyg.saveModifiedImages(this.$content).then(function () {
             return self.wysiwyg.save().then(function (result) {
                 self._isDirty = result.isDirty;
                 _super();
@@ -449,6 +449,19 @@ var FieldHtml = basic_fields.DebouncedField.extend(TranslatableFieldMixin, {
         $lis.not('[id]').each(function () {
             $(this).attr('id', 'checklist-id-' + (++max));
         });
+    },
+    /**
+     * Allows Enter keypress in a textarea (source mode)
+     *
+     * @private
+     * @param {OdooEvent} ev
+     */
+    _onKeydown: function (ev) {
+        if (ev.which === $.ui.keyCode.ENTER && $(ev.target).is('textarea')) {
+            ev.stopPropagation();
+            return;
+        }
+        this._super.apply(this, arguments);
     },
     /**
      * Method called when wysiwyg triggers a change.

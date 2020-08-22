@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo.addons.test_mail_full.tests import common as test_mail_full_common
+from odoo.addons.test_mail_full.tests.common import TestMailFullCommon, TestRecipients
 
 
-class TestSMSComposerComment(test_mail_full_common.TestSMSCommon, test_mail_full_common.TestRecipients):
+class TestSMSComposerComment(TestMailFullCommon, TestRecipients):
     """ TODO LIST
 
      * add test for default_res_model / default_res_id and stuff like that;
@@ -201,7 +201,7 @@ class TestSMSComposerComment(test_mail_full_common.TestSMSCommon, test_mail_full
         self.assertSMSSent(self.random_numbers_san, self._test_body)
 
 
-class TestSMSComposerBatch(test_mail_full_common.TestSMSCommon):
+class TestSMSComposerBatch(TestMailFullCommon):
     @classmethod
     def setUpClass(cls):
         super(TestSMSComposerBatch, cls).setUpClass()
@@ -277,7 +277,7 @@ class TestSMSComposerBatch(test_mail_full_common.TestSMSCommon):
             self.assertSMSNotification([{'partner': r.customer_id} for r in self.records], 'Zizisse an SMS.', messages)
 
 
-class TestSMSComposerMass(test_mail_full_common.TestSMSCommon):
+class TestSMSComposerMass(TestMailFullCommon):
 
     @classmethod
     def setUpClass(cls):
@@ -519,7 +519,7 @@ class TestSMSComposerMass(test_mail_full_common.TestSMSCommon):
         # Composer creation with context from a template context action (simulate) - comment (single recipient)
         with self.with_user('employee'):
             composer = self.env['sms.composer'].with_context(
-                default_composition_mode='guess',
+                sms_composition_mode='guess',
                 default_res_ids=[test_record_2.id],
                 default_res_id=test_record_2.id,
                 active_ids=[test_record_2.id],
@@ -529,8 +529,6 @@ class TestSMSComposerMass(test_mail_full_common.TestSMSCommon):
             ).create({
                 'mass_keep_log': False,
             })
-            # Call manually the onchange
-            composer._onchange_template_id()
             self.assertEqual(composer.composition_mode, "comment")
             self.assertEqual(composer.body, "Hello %s ceci est en français." % test_record_2.display_name)
 
@@ -543,7 +541,7 @@ class TestSMSComposerMass(test_mail_full_common.TestSMSCommon):
         # Composer creation with context from a template context action (simulate) - mass (multiple recipient)
         with self.with_user('employee'):
             composer = self.env['sms.composer'].with_context(
-                default_composition_mode='guess',
+                sms_composition_mode='guess',
                 default_res_ids=[test_record_1.id, test_record_2.id],
                 default_res_id=test_record_1.id,
                 active_ids=[test_record_1.id, test_record_2.id],
@@ -553,8 +551,6 @@ class TestSMSComposerMass(test_mail_full_common.TestSMSCommon):
             ).create({
                 'mass_keep_log': True,
             })
-            # Call manually the onchange
-            composer._onchange_template_id()
             self.assertEqual(composer.composition_mode, "mass")
             # In english because by default but when sinding depending of record
             self.assertEqual(composer.body, "Dear ${object.display_name} this is an SMS.")

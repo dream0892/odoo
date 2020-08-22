@@ -54,6 +54,10 @@
         > input {
             padding-right: 15px;
             cursor: pointer;
+
+            &::-ms-clear {
+                display: none;
+            }
         }
 
         .o_dropdown_button {
@@ -494,6 +498,7 @@
         user-select: none;
         background-color: rgba(lightgray, 0.5);;
         font-weight: 500;
+        @include o-text-overflow;
     }
 }
 

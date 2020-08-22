@@ -1,7 +1,7 @@
 odoo.define('web_editor.utils', function (require) {
 'use strict';
 
-const ColorpickerDialog = require('web.ColorpickerDialog');
+const {ColorpickerWidget} = require('web.Colorpicker');
 
 /**
  * window.getComputedStyle cannot work properly with CSS shortcuts (like
@@ -121,8 +121,8 @@ function _getNumericAndUnit(value) {
  */
 function _areCssValuesEqual(value1, value2, cssProp, $target) {
     // If not colors, they will be left untouched
-    value1 = ColorpickerDialog.normalizeCSSColor(value1);
-    value2 = ColorpickerDialog.normalizeCSSColor(value2);
+    value1 = ColorpickerWidget.normalizeCSSColor(value1);
+    value2 = ColorpickerWidget.normalizeCSSColor(value2);
 
     // String comparison first
     if (value1 === value2) {
@@ -139,6 +139,81 @@ function _areCssValuesEqual(value1, value2, cssProp, $target) {
     const numValue2 = _convertValueToUnit(value2, data[1], cssProp, $target);
     return (Math.abs(numValue1 - numValue2) < Number.EPSILON);
 }
+/**
+ * @param {string|number} name
+ * @returns {boolean}
+ */
+function _isColorCombinationName(name) {
+    const number = parseInt(name);
+    return (!isNaN(number) && number % 100 !== 0);
+}
+/**
+ * @param {string[]} colorNames
+ * @param {string} [prefix='bg-']
+ * @returns {string[]}
+ */
+function _computeColorClasses(colorNames, prefix = 'bg-') {
+    let hasCCClasses = false;
+    const isBgPrefix = (prefix === 'bg-');
+    const classes = colorNames.map(c => {
+        if (isBgPrefix && _isColorCombinationName(c)) {
+            hasCCClasses = true;
+            return `o_cc${c}`;
+        }
+        return (prefix + c);
+    });
+    if (hasCCClasses) {
+        classes.push('o_cc');
+    }
+    return classes;
+}
+/**
+ * @param {string} key
+ * @param {CSSStyleDeclaration} [htmlStyle] if not provided, it is computed
+ * @returns {string}
+ */
+function _getCSSVariableValue(key, htmlStyle) {
+    if (htmlStyle === undefined) {
+        htmlStyle = window.getComputedStyle(document.documentElement);
+    }
+    // Get trimmed value from the HTML element
+    let value = htmlStyle.getPropertyValue(`--${key}`).trim();
+    // If it is a color value, it needs to be normalized
+    value = ColorpickerWidget.normalizeCSSColor(value);
+    // Normally scss-string values are "printed" single-quoted. That way no
+    // magic conversation is needed when customizing a variable: either save it
+    // quoted for strings or non quoted for colors, numbers, etc. However,
+    // Chrome has the annoying behavior of changing the single-quotes to
+    // double-quotes when reading them through getPropertyValue...
+    return value.replace(/"/g, "'");
+}
+/**
+ * Normalize a color in case it is a variable name so it can be used outside of
+ * css.
+ *
+ * @param {string} color the color to normalize into a css value
+ * @returns {string} the normalized color
+ */
+function _normalizeColor(color) {
+    if (ColorpickerWidget.isCSSColor(color)) {
+        return color;
+    }
+    return _getCSSVariableValue(color);
+}
+/**
+ * Parse an element's background-image's url.
+ *
+ * @param {string} string a css value in the form 'url("...")'
+ * @returns {string|false} the src of the image or false if not parsable
+ */
+function _getBgImageURL(el) {
+    const string = $(el).css('background-image');
+    const match = string.match(/^url\((['"])(.*?)\1\)$/);
+    if (!match) {
+        return '';
+    }
+    return match[2];
+}
 
 return {
     CSS_SHORTHANDS: CSS_SHORTHANDS,
@@ -148,5 +223,10 @@ return {
     convertNumericToUnit: _convertNumericToUnit,
     getNumericAndUnit: _getNumericAndUnit,
     areCssValuesEqual: _areCssValuesEqual,
+    isColorCombinationName: _isColorCombinationName,
+    computeColorClasses: _computeColorClasses,
+    getCSSVariableValue: _getCSSVariableValue,
+    normalizeColor: _normalizeColor,
+    getBgImageURL: _getBgImageURL,
 };
 });

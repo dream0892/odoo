@@ -83,7 +83,6 @@
 
         <script type="text/javascript" src="/website/static/src/js/content/website_root.js"/>
         <script type="text/javascript" src="/website/static/src/js/content/compatibility.js"/>
-        <script type="text/javascript" src="/website/static/src/js/content/lazy_template_call.js"/>
         <script type="text/javascript" src="/website/static/src/js/content/menu.js"/>
         <script type="text/javascript" src="/website/static/src/js/content/snippets.animation.js"/>
 
@@ -91,6 +90,7 @@
 
         <script type="text/javascript" src="/website/static/src/js/visitor_timezone.js"/>
         <script type="text/javascript" src="/website/static/src/js/show_password.js"/>
+        <script type="text/javascript" src="/website/static/src/js/post_link.js"/>
         <!-- Custom empty file for user javascript -->
         <script type="text/javascript" src="/website/static/src/js/user_custom_javascript.js"/>
     </xpath>
@@ -109,7 +109,7 @@
     </xpath>
 </template>
 
-<template id="website.compiled_assets_wysiwyg" name="Website Editor Assets (used in website editor)">
+<template id="website.compiled_assets_wysiwyg" name="Website Editor Assets (used in website editor)" groups="website.group_website_publisher">
     <t t-call-assets="website.assets_wysiwyg"/>
 </template>
 
@@ -137,6 +137,10 @@
     <script type="text/javascript" src="/website/static/src/snippets/s_showcase/options.js"/>
     <script type="text/javascript" src="/website/static/src/snippets/s_table_of_content/options.js"/>
     <script type="text/javascript" src="/website/static/src/snippets/s_timeline/options.js"/>
+    <script type="text/javascript" src="/website/static/src/snippets/s_media_list/options.js"/>
+    <script type="text/javascript" src="/website/static/src/snippets/s_google_map/options.js"/>
+    <script type="text/javascript" src="/website/static/src/snippets/s_dynamic_snippet/options.js"/>
+    <script type="text/javascript" src="/website/static/src/snippets/s_dynamic_snippet_carousel/options.js"/>
 
     <script type="text/javascript" src="/website/static/src/js/editor/wysiwyg_multizone.js"/>
     <script type="text/javascript" src="/website/static/src/js/editor/wysiwyg_multizone_translate.js"/>

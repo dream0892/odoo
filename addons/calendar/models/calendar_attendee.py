@@ -107,7 +107,7 @@ class Attendee(models.Model):
         rendering_context.update({
             'colors': colors,
             'ignore_recurrence': ignore_recurrence,
-            'action_id': self.env['ir.actions.act_window'].search([('view_id', '=', calendar_view.id)], limit=1).id,
+            'action_id': self.env['ir.actions.act_window'].sudo().search([('view_id', '=', calendar_view.id)], limit=1).id,
             'dbname': self._cr.dbname,
             'base_url': self.env['ir.config_parameter'].sudo().get_param('web.base.url', default='http://localhost:8069'),
         })
@@ -118,21 +118,22 @@ class Attendee(models.Model):
                 event_id = attendee.event_id.id
                 ics_file = ics_files.get(event_id)
 
+                attachment_values = []
                 if ics_file:
                     attachment_values = [
                         (0, 0, {'name': 'invitation.ics',
                                 'mimetype': 'text/calendar',
                                 'datas': base64.b64encode(ics_file)})
                     ]
-                body = self.env['mail.template'].with_context(rendering_context)._render_template(
-                    invitation_template.body_html,
-                    self._name,
-                    attendee.ids)
-                # TODO check lang
-                subject = self.env['mail.template']._render_template(
-                    invitation_template.subject,
-                    self._name,
-                    attendee.ids)
+                body = invitation_template.with_context(rendering_context)._render_field(
+                    'body_html',
+                    attendee.ids,
+                    compute_lang=True,
+                    post_process=True)[attendee.id]
+                subject = invitation_template._render_field(
+                    'subject',
+                    attendee.ids,
+                    compute_lang=True)[attendee.id]
                 attendee.event_id.with_context(no_document=True).message_notify(
                     body=body,
                     subject=subject,

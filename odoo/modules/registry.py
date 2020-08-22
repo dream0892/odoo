@@ -19,7 +19,7 @@ import psycopg2
 import odoo
 from .. import SUPERUSER_ID
 from odoo.sql_db import TestCursor
-from odoo.tools import (assertion_report, config, existing_tables, ignore,
+from odoo.tools import (config, existing_tables, ignore,
                         lazy_classproperty, lazy_property, sql, OrderedSet)
 from odoo.tools.lru import LRU
 
@@ -110,10 +110,11 @@ class Registry(Mapping):
         self.models = {}    # model name/model instance mapping
         self._sql_constraints = set()
         self._init = True
-        self._assertion_report = assertion_report.assertion_report()
+        self._assertion_report = odoo.tests.runner.OdooTestResult()
         self._fields_by_model = None
         self._ordinary_tables = None
         self._constraint_queue = deque()
+        self.__cache = LRU(8192)
 
         # modules fully loaded (maintained during init phase by `loading` module)
         self._init_modules = set()
@@ -218,6 +219,7 @@ class Registry(Mapping):
         """
         from .. import models
 
+        self.clear_caches()
         lazy_property.reset_all(self)
 
         # Instantiate registered classes (via the MetaModel automatic discovery
@@ -234,6 +236,7 @@ class Registry(Mapping):
         """ Complete the setup of models.
             This must be called after loading modules and before using the ORM.
         """
+        self.clear_caches()
         lazy_property.reset_all(self)
         self.registry_invalidated = True
         env = odoo.api.Environment(cr, SUPERUSER_ID, {})
@@ -270,7 +273,7 @@ class Registry(Mapping):
     def field_computed(self):
         """ Return a dict mapping each field to the fields computed by the same method. """
         computed = {}
-        for Model in self.models.values():
+        for model_name, Model in self.models.items():
             groups = defaultdict(list)
             for field in Model._fields.values():
                 if field.compute:
@@ -279,7 +282,7 @@ class Registry(Mapping):
             for fields in groups.values():
                 if len({field.compute_sudo for field in fields}) > 1:
                     _logger.warning("%s: inconsistent 'compute_sudo' for computed fields: %s",
-                                    self._name, ", ".join(field.name for field in fields))
+                                    model_name, ", ".join(field.name for field in fields))
         return computed
 
     @lazy_property
@@ -301,8 +304,10 @@ class Registry(Mapping):
                 return
             for seq1 in dependencies[field]:
                 yield seq1
-                for seq2 in transitive_dependencies(seq1[-1], seen + [field]):
-                    yield concat(seq1[:-1], seq2)
+                exceptions = (Exception,) if field.base_field.manual else ()
+                with ignore(*exceptions):
+                    for seq2 in transitive_dependencies(seq1[-1], seen + [field]):
+                        yield concat(seq1[:-1], seq2)
 
         def concat(seq1, seq2):
             if seq1 and seq2:
@@ -331,20 +336,27 @@ class Registry(Mapping):
     def post_constraint(self, func, *args, **kwargs):
         """ Call the given function, and delay it if it fails during an upgrade. """
         try:
-            func(*args, **kwargs)
+            if (func, args, kwargs) not in self._constraint_queue:
+                # Module A may try to apply a constraint and fail but another module B inheriting
+                # from Module A may try to reapply the same constraint and succeed, however the
+                # constraint would already be in the _constraint_queue and would be executed again
+                # at the end of the registry cycle, this would fail (already-existing constraint)
+                # and generate an error, therefore a constraint should only be applied if it's
+                # not already marked as "to be applied".
+                func(*args, **kwargs)
         except Exception as e:
             if self._is_install:
                 _schema.error(*e.args)
             else:
                 _schema.info(*e.args)
-                self._constraint_queue.append(partial(func, *args, **kwargs))
+                self._constraint_queue.append((func, args, kwargs))
 
     def finalize_constraints(self):
         """ Call the delayed functions from above. """
         while self._constraint_queue:
-            func = self._constraint_queue.popleft()
+            func, args, kwargs = self._constraint_queue.popleft()
             try:
-                func()
+                func(*args, **kwargs)
             except Exception as e:
                 _schema.error(*e.args)
 
@@ -479,7 +491,11 @@ class Registry(Mapping):
         Verify that all tables are present and try to initialize those that are missing.
         """
         env = odoo.api.Environment(cr, SUPERUSER_ID, {})
-        table2model = {model._table: name for name, model in env.items() if not model._abstract}
+        table2model = {
+            model._table: name
+            for name, model in env.items()
+            if not model._abstract and model.__class__._table_query is None
+        }
         missing_tables = set(table2model).difference(existing_tables(cr, table2model))
 
         if missing_tables:
@@ -495,15 +511,9 @@ class Registry(Mapping):
             for table in missing_tables:
                 _logger.error("Model %s has no table.", table2model[table])
 
-    @lazy_property
-    def cache(self):
-        """ A cache for model methods. """
-        # this lazy_property is automatically reset by lazy_property.reset_all()
-        return LRU(8192)
-
     def _clear_cache(self):
         """ Clear the cache and mark it as invalidated. """
-        self.cache.clear()
+        self.__cache.clear()
         self.cache_invalidated = True
 
     def clear_caches(self):
@@ -609,7 +619,7 @@ class Registry(Mapping):
                 self.setup_models(cr)
                 self.registry_invalidated = False
         if self.cache_invalidated:
-            self.cache.clear()
+            self.__cache.clear()
             self.cache_invalidated = False
 
     @contextmanager

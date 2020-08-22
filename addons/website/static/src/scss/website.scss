@@ -2,20 +2,12 @@
 /// This file regroups the website design rules.
 ///
 
-$-seen: ();
-$-font-numbers: (
-    o-website-value('font-number'),
-    o-website-value('headings-font-number'),
-    o-website-value('navbar-font-number'),
-    o-website-value('buttons-font-number'),
-);
-@each $-number in $-font-numbers {
-    @if index($-seen, $-number) == null {
-        $-seen: append($-seen, $-number);
-        $-theme-font: nth($o-theme-font-urls, $-number);
-        @if $-theme-font {
-            @import url("https://fonts.googleapis.com/css?family=#{unquote($-theme-font)}&display=swap");
-        }
+$-seen-urls: ();
+@each $alias, $key in $o-font-aliases-to-keys {
+    $-url: o-get-font-info($alias, 'url');
+    @if $-url and index($-seen-urls, $-url) == null {
+        $-seen-urls: append($-seen-urls, $-url);
+        @import url("https://fonts.googleapis.com/css?family=#{unquote($-url)}&display=swap");
     }
 }
 
@@ -25,49 +17,45 @@ $-font-numbers: (
     // customized by themes, the user or anything else (so there is no file to
     // parse to get them). Those will be printed here as CSS variables.
 
-    // 0) does this theme enforce primary = alpha or secondary = beta
-    --is-alpha-primary: #{$-is-alpha-primary};
-    --is-beta-secondary: #{$-is-beta-secondary};
+    @include print-variable('support-13-0-color-system', $o-support-13-0-color-system);
+    @include print-variable('has-customized-13-0-color-system', $o-has-customized-13-0-color-system);
 
     // 1) Handle default values
-    --header-font-size: #{$font-size-base};
+    @include print-variable('header-font-size', $font-size-base);
 
     // 2) The values in the $theme-colors map are already printed by Bootstrap.
 
     // 3) The values in the $colors map are also printed by Bootstrap.
 
     // 4) The Odoo values map, $o-website-values, must be printed.
-    @each $key, $value in o-map-omit($o-website-values) {
-        --#{$key}: #{$value};
+    @each $key, $value in $o-website-values {
+        @include print-variable($key, $value);
     }
 
     // 5) Use final value used by the theme
-    $-h1-color: if($headings-color == inherit or not $headings-color, $body-color, $headings-color);
-    $-h2-color: if(color('h2'), color('h2'), $-h1-color);
-    $-h3-color: if(color('h3'), color('h3'), $-h2-color);
-    $-h4-color: if(color('h4'), color('h4'), $-h3-color);
-    $-h5-color: if(color('h5'), color('h5'), $-h4-color);
-    $-h6-color: if(color('h6'), color('h6'), $-h5-color);
+    @include print-variable('body', $body-bg);
 
-    --body: #{$body-bg};
-    --text: #{$body-color};
-    --h1: #{$-h1-color};
-    --h2: #{$-h2-color};
-    --h3: #{$-h3-color};
-    --h4: #{$-h4-color};
-    --h5: #{$-h5-color};
-    --h6: #{$-h6-color};
+    @include print-variable('logo-height', $o-theme-navbar-logo-height);
+    @include print-variable('fixed-logo-height', $o-theme-navbar-fixed-logo-height);
 
-    --logo-height: #{$o-theme-navbar-logo-height};
-    --fixed-logo-height: #{$o-theme-navbar-fixed-logo-height};
-    --number-of-fonts: #{length($o-theme-fonts)};
+    $-font-names: map-keys($o-theme-font-configs);
+    @include print-variable('number-of-fonts', length($-font-names));
+    $i: 1;
+    @each $font-name in $-font-names {
+        @include print-variable('font-number-#{$i}', $font-name);
+        $i: $i + 1;
+    }
+
+    @include print-variable('number-of-color-palettes', length($o-color-palettes) - 1); // -1 since the last one is the user customized one
+    @include print-variable('color-palettes-number', $o-original-color-palette-number);
+    @include print-variable('has-customized-colors', $o-has-customized-colors);
 
     // 6) Get list of colorpalette custom colors
     $custom-colors: ();
     @each $key, $value in $o-color-palette {
         $custom-colors: append($custom-colors, $key);
     }
-    --custom-colors: #{$custom-colors};
+    @include print-variable('custom-colors', $custom-colors);
 }
 
 #wrapwrap {
@@ -82,7 +70,7 @@ $-font-numbers: (
         }
 
         #wrap {
-            background-color: $white;
+            background-color: o-color('o-cc1-bg');
         }
     }
 }
@@ -107,11 +95,9 @@ $-font-numbers: (
     // anyway. Automatically mimic navbar-dark if the user's menu color is dark.
     // Note: this only works because navbar-light is defined before navbar-dark,
     // we may want to use a safest way when possible.
-    @if color('menu') {
-        background-color: color('menu') !important;
-        @if (color-yiq(color('menu')) != $yiq-text-dark) {
-            @extend .navbar-dark;
-        }
+    @include o-apply-colors('menu');
+    @if (color-yiq(o-color('menu')) != $yiq-text-dark) {
+        @extend .navbar-dark;
     }
 }
 
@@ -121,7 +107,7 @@ $-header-nav-link-height: $nav-link-height;
     header {
         font-size: o-website-value('header-font-size');
 
-        .dropdown-menu {
+        .dropdown-menu, .btn {
             font-size: inherit;
         }
     }
@@ -141,30 +127,26 @@ $-header-nav-link-height: $nav-link-height;
 }
 
 .o_footer {
-    @if color('footer') {
-        @include o-bg-color(color('footer'));
-    }
+    @include o-apply-colors('footer');
 
-    > #footer {
-        // FIXME needed to prevent the dropzone at the bottom of the #wrap element
-        // to be at the same place of the dropzone at the top of the #footer element
-        border-top: 1px solid transparent;
+    .o_footer_copyright {
+        @include o-apply-colors('copyright', $background: o-color('footer'));
     }
 }
 h2, h3, h4, h5, h6 {
-    color: color('h2');
+    color: color('o-cc1-h2');
 }
 h3, h4, h5, h6 {
-    color: color('h3');
+    color: color('o-cc1-h3');
 }
 h4, h5, h6 {
-    color: color('h4');
+    color: color('o-cc1-h4');
 }
 h5, h6 {
-    color: color('h5');
+    color: color('o-cc1-h5');
 }
 h6 {
-    color: color('h6');
+    color: color('o-cc1-h6');
 }
 .btn {
     @if ($o-theme-buttons-font != $o-theme-font) {
@@ -246,14 +228,6 @@ font[class*='bg-'] {
     }
 }
 
-// Blockquotes
-.blockquote {
-    font-size: 1rem;
-    footer {
-        background-color: inherit;
-    }
-}
-
 // Background Images
 .oe_img_bg {
     background-size: cover;
@@ -282,16 +256,8 @@ font[class*='bg-'] {
 }
 
 // Background videos
-.o_background_video {
-    position: relative;
-
-    > * {
-        position: relative;
-    }
-}
 .o_bg_video_container {
-    @include o-position-absolute(0, 0 ,0 ,0);
-    overflow: hidden;
+    @extend %o-we-background-layer;
 }
 .o_bg_video_iframe {
     position: relative;
@@ -614,31 +580,14 @@ table.table_desc tr td {
 
 // Parallax
 .parallax {
-    position: relative;
-
     // TODO this introduces a limitation: no dropdown will be able to
     // overflow. Maybe there is a better way to find.
     &:not(.s_parallax_no_overflow_hidden) {
         overflow: hidden;
     }
 
-    > * {
-        position: relative;
-    }
     > .s_parallax_bg {
-        @include o-position-absolute(0, 0, 0, 0);
-        display: block;
-        background-color: inherit;
-        background-size: cover;
-        background-attachment: scroll;
-        pointer-events: none;
-
-        &::after {
-            content: "";
-            @include o-position-absolute(0, 0, 0, 0);
-            display: block;
-            background-color: inherit;
-        }
+        @extend %o-we-background-layer;
     }
     @include media-breakpoint-up(xl) {
         // Fixed backgrounds are disabled when using a mobile/tablet device,
@@ -662,7 +611,6 @@ $-transition-duration: 200ms;
     display: block;
     @include o-position-absolute(0, 0, auto, 0);
     position: fixed;
-    z-index: $zindex-modal - 20;
     background: $light;
 
     &:not(.o_header_no_transition) {
@@ -693,6 +641,15 @@ $-transition-duration: 200ms;
                     img {
                         height: 0px;
                     }
+                }
+            }
+        }
+    }
+    &.o_header_standard.o_header_is_scrolled {
+        @if index(('menu_logo_below', 'logo_menu_below'), o-website-value('header-template')) != null {
+            .navbar-brand {
+                &, img {
+                    transition: none;
                 }
             }
         }
@@ -728,6 +685,10 @@ $-transition-duration: 200ms;
 
 // Header templates
 header {
+    &#top {
+        // We need this z-index for the shadow option of the header
+        z-index: $zindex-modal - 20;
+    }
     &:not(.o_header_no_transition) {
         .navbar-brand {
             transition: font-size $-transition-duration, opacity $-transition-duration ease-out;
@@ -881,27 +842,38 @@ header {
             &, ul, .o_footer_address, .o_footer_logo {
                 padding-top: $spacer;
             }
-            li a {
-                text-transform: uppercase;
+        }
+    }
+}
+
+@if index(('slideout_slide_hover', 'slideout_shadow'), o-website-value('footer-effect')) {
+    @include media-breakpoint-up(lg) {
+        #wrapwrap.o_footer_effect_enable {
+            > main {
+                background-color: $body-bg;
+                @if o-website-value('footer-effect') == 'slideout_shadow' {
+                    box-shadow: $box-shadow;
+                }
+            }
+            > footer {
+                @include o-position-absolute(0, 0, 0, 0);
+                position: sticky;
+                z-index: -1;
             }
         }
     }
 }
 
-// Copyright
-.o_footer_copyright {
-    padding: 8px;
-    .js_language_selector {
-        display: inline-block;
-    }
-    @include media-breakpoint-up(md) {
-        .row {
-            display: flex;
-            > div {
-                margin: auto 0;
-            }
-        }
-    }
+// Language selector
+.js_language_selector .dropdown-menu {
+    min-width: 0;
+}
+.o_lang_flag {
+    width: 1.5em;
+    height: 1.5em;
+    margin-right: 0.2em;
+    border-radius: $rounded-pill;
+    vertical-align: top;
 }
 
 // Figure with special style
@@ -974,5 +946,49 @@ header {
     7%, 21% {
         transform: scale(1.3);
         background-color: rgba(theme-color('primary'), 0.8);
+    }
+}
+
+$ribbon-padding: 100px;
+.o_ribbon {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: bold;
+    white-space: nowrap;
+    text-align: center;
+    pointer-events: none;
+}
+
+.o_ribbon_right {
+    @include o-position-absolute($top: 0, $right: 0);
+    padding: 0.5rem $ribbon-padding;
+    // 0.708 is 1 - cos(45deg)
+    // Transforms are applied right-to-left
+    // Cannot use matrix because of the use of % values.
+    transform: translateX(calc(-0.708 * (100% - #{2 * $ribbon-padding}))) rotate(45deg) translateX(calc(100% - #{$ribbon-padding}));
+    transform-origin: top right;
+}
+
+.o_ribbon_left {
+    @include o-position-absolute($top: 0, $left: 0);
+    padding: 0.5rem $ribbon-padding;
+    transform: translateX(calc(0.708 * (100% - #{2 * $ribbon-padding}) - 100%)) rotate(-45deg) translateX($ribbon-padding);
+    transform-origin: top right;
+}
+
+.o_tag_right {
+    @include o-position-absolute($top: 0, $right: 0);
+    padding: 0.25rem 1rem;
+}
+
+.o_tag_left {
+    @include o-position-absolute($top: 0, $left: 0);
+    padding: 0.25rem 1rem;
+}
+
+// Cookies Bar
+#website_cookies_bar {
+    :not(.o_cookies_popup) {
+        bottom: 0;
     }
 }

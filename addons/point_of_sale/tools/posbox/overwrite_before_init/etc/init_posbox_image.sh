@@ -20,6 +20,8 @@ echo "export LC_ALL=en_US.UTF-8" >> ~/.bashrc
 locale-gen
 source ~/.bashrc
 
+apt-mark hold firmware-brcm80211
+# upgrade firmware-brcm80211 broke access point on rpi4
 apt-get update && apt-get -y upgrade
 # Do not be too fast to upgrade to more recent firmware and kernel than 4.38
 # Firmware 4.44 seems to prevent the LED mechanism from working
@@ -148,6 +150,7 @@ update-rc.d -f dnsmasq remove
 update-rc.d timesyncd defaults
 
 systemctl enable ramdisks.service
+systemctl enable led-status.service
 systemctl disable dphys-swapfile.service
 systemctl enable ssh
 systemctl set-default graphical.target
@@ -156,6 +159,7 @@ systemctl enable autologin@.service
 systemctl disable systemd-timesyncd.service
 systemctl unmask hostapd.service
 systemctl disable hostapd.service
+systemctl disable cups-browsed.service
 
 # disable overscan in /boot/config.txt, we can't use
 # overwrite_after_init because it's on a different device
@@ -168,7 +172,7 @@ echo "disable_overscan=1" >> /boot/config.txt
 sed -i '/dtoverlay/d' /boot/config.txt
 
 # exclude /drivers folder from git info to be able to load specific drivers
-echo "addons/hw_drivers/drivers/" > /home/pi/odoo/.git/info/exclude
+echo "addons/hw_drivers/iot_devices/" > /home/pi/odoo/.git/info/exclude
 
 # create dirs for ramdisks
 create_ramdisk_dir () {

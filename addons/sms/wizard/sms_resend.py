@@ -27,7 +27,7 @@ class SMSResend(models.TransientModel):
     @api.model
     def default_get(self, fields):
         result = super(SMSResend, self).default_get(fields)
-        if result.get('mail_message_id'):
+        if 'recipient_ids' in fields and result.get('mail_message_id'):
             mail_message_id = self.env['mail.message'].browse(result['mail_message_id'])
             result['recipient_ids'] = [(0, 0, {
                 'notification_id': notif.id,
@@ -41,7 +41,12 @@ class SMSResend(models.TransientModel):
     mail_message_id = fields.Many2one('mail.message', 'Message', readonly=True, required=True)
     recipient_ids = fields.One2many('sms.resend.recipient', 'sms_resend_id', string='Recipients')
     has_cancel = fields.Boolean(compute='_compute_has_cancel')
-    has_insufficient_credit = fields.Boolean(compute='_compute_has_insufficient_credit') 
+    has_insufficient_credit = fields.Boolean(compute='_compute_has_insufficient_credit')
+    has_unregistered_account = fields.Boolean(compute='_compute_has_unregistered_account')
+
+    @api.depends("recipient_ids.failure_type")
+    def _compute_has_unregistered_account(self):
+        self.has_unregistered_account = self.recipient_ids.filtered(lambda p: p.failure_type == 'sms_acc')
 
     @api.depends("recipient_ids.failure_type")
     def _compute_has_insufficient_credit(self):

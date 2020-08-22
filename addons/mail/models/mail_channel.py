@@ -184,9 +184,12 @@ class Channel(models.Model):
 
     @api.onchange('moderator_ids')
     def _onchange_moderator_ids(self):
-        missing_partners = self.mapped('moderator_ids.partner_id') - self.mapped('channel_last_seen_partner_ids.partner_id')
-        for partner in missing_partners:
-            self.channel_last_seen_partner_ids += self.env['mail.channel.partner'].new({'partner_id': partner.id})
+        missing_partner_ids = set(self.mapped('moderator_ids.partner_id').ids) - set(self.mapped('channel_last_seen_partner_ids.partner_id').ids)
+        if missing_partner_ids:
+            self.channel_last_seen_partner_ids = [
+                (0, 0, {'partner_id': partner_id})
+                for partner_id in missing_partner_ids
+            ]
 
     @api.onchange('email_send')
     def _onchange_email_send(self):
@@ -278,6 +281,9 @@ class Channel(models.Model):
     def _action_unfollow(self, partner):
         channel_info = self.channel_info('unsubscribe')[0]  # must be computed before leaving the channel (access rights)
         result = self.write({'channel_partner_ids': [(3, partner.id)]})
+        # side effect of unsubscribe that wasn't taken into account because
+        # channel_info is called before actually unpinning the channel
+        channel_info['is_pinned'] = False
         self.env['bus.bus'].sendone((self._cr.dbname, 'res.partner', partner.id), channel_info)
         if not self.email_send:
             notification = _('<div class="o_mail_notification">left <a href="#" class="o_channel_redirect" data-oe-id="%s">#%s</a></div>') % (self.id, self.name,)
@@ -423,8 +429,8 @@ class Channel(models.Model):
             create_values = {
                 'email_from': company.catchall_formatted or company.email_formatted,
                 'author_id': self.env.user.partner_id.id,
-                'body_html': view.render({'channel': self, 'partner': partner}, engine='ir.qweb', minimal_qcontext=True),
-                'subject': _("Guidelines of channel %s") % self.name,
+                'body_html': view._render({'channel': self, 'partner': partner}, engine='ir.qweb', minimal_qcontext=True),
+                'subject': _("Guidelines of channel %s", self.name),
                 'recipient_ids': [(4, partner.id)]
             }
             mail = self.env['mail.mail'].sudo().create(create_values)
@@ -570,13 +576,6 @@ class Channel(models.Model):
 
             # find the channel partner state, if logged user
             if self.env.user and self.env.user.partner_id:
-                # add the partner for 'direct mesage' channel
-                if channel.channel_type == 'chat':
-                    # direct_partner should be removed from channel info since we can find it from members and channel_type
-                    # we keep it know to avoid change tests and javascript
-                    direct_partner = channel_partners.filtered(lambda pc: pc.partner_id.id != self.env.user.partner_id.id)
-                    if direct_partner:
-                        info['direct_partner'] = [partner_infos[direct_partner[0].partner_id.id]]
                 # add needaction and unread counter, since the user is logged
                 info['message_needaction_counter'] = channel.message_needaction_counter
                 info['message_unread_counter'] = channel.message_unread_counter
@@ -589,15 +588,18 @@ class Channel(models.Model):
                     info['is_minimized'] = partner_channel.is_minimized
                     info['seen_message_id'] = partner_channel.seen_message_id.id
                     info['custom_channel_name'] = partner_channel.custom_channel_name
+                    info['is_pinned'] = partner_channel.is_pinned
 
             # add members infos
             partner_ids = channel_partners.mapped('partner_id').ids
             info['members'] = [partner_infos[partner] for partner in partner_ids]
-            info['seen_partners_info'] = [{
-                'partner_id': cp.partner_id.id,
-                'fetched_message_id': cp.fetched_message_id.id,
-                'seen_message_id': cp.seen_message_id.id,
-            } for cp in channel_partners]
+            if channel.channel_type != 'channel':
+                info['seen_partners_info'] = [{
+                    'id': cp.id,
+                    'partner_id': cp.partner_id.id,
+                    'fetched_message_id': cp.fetched_message_id.id,
+                    'seen_message_id': cp.seen_message_id.id,
+                } for cp in channel_partners]
 
             channel_infos.append(info)
         return channel_infos
@@ -630,14 +632,14 @@ class Channel(models.Model):
             partners_to.append(self.env.user.partner_id.id)
             # determine type according to the number of partner in the channel
             self.env.cr.execute("""
-                SELECT P.channel_id as channel_id
+                SELECT P.channel_id
                 FROM mail_channel C, mail_channel_partner P
                 WHERE P.channel_id = C.id
                     AND C.public LIKE 'private'
                     AND P.partner_id IN %s
-                    AND channel_type LIKE 'chat'
+                    AND C.channel_type LIKE 'chat'
                 GROUP BY P.channel_id
-                HAVING array_agg(P.partner_id ORDER BY P.partner_id) = %s
+                HAVING ARRAY_AGG(DISTINCT P.partner_id ORDER BY P.partner_id) = %s
             """, (tuple(partners_to), sorted(list(partners_to)),))
             result = self.env.cr.dictfetchall()
             if result:
@@ -728,6 +730,7 @@ class Channel(models.Model):
                 'fetched_message_id': last_message_id,
             })
             data = {
+                'id': channel_partner.id,
                 'info': 'channel_seen',
                 'last_message_id': last_message_id,
                 'partner_id': self.env.user.partner_id.id,
@@ -757,6 +760,7 @@ class Channel(models.Model):
                 'fetched_message_id': last_message_id,
             })
             data = {
+                'id': channel_partner.id,
                 'info': 'channel_fetched',
                 'last_message_id': last_message_id,
                 'partner_id': self.env.user.partner_id.id,
@@ -795,20 +799,15 @@ class Channel(models.Model):
             'custom_channel_name': name,
         })
 
-    def notify_typing(self, is_typing, is_website_user=False):
+    def notify_typing(self, is_typing):
         """ Broadcast the typing notification to channel members
             :param is_typing: (boolean) tells whether the current user is typing or not
-            :param is_website_user: (boolean) tells whether the user that notifies comes
-              from the website-side. This is useful in order to distinguish operator and
-              unlogged users for livechat, because unlogged users have the same
-              partner_id as the admin (default: False).
         """
         notifications = []
         for channel in self:
             data = {
                 'info': 'typing_status',
                 'is_typing': is_typing,
-                'is_website_user': is_website_user,
                 'partner_id': self.env.user.partner_id.id,
             }
             notifications.append([(self._cr.dbname, 'mail.channel', channel.id), data]) # notify backend users
@@ -970,12 +969,12 @@ class Channel(models.Model):
         })
 
     def _define_command_help(self):
-        return {'help': _("Show an helper message")}
+        return {'help': _("Show a helper message")}
 
     def _execute_command_help(self, **kwargs):
         partner = self.env.user.partner_id
         if self.channel_type == 'channel':
-            msg = _("You are in channel <b>#%s</b>.") % self.name
+            msg = _("You are in channel <b>#%s</b>.", self.name)
             if self.public == 'private':
                 msg += _(" This channel is private. People must be invited to join it.")
         else:
@@ -984,9 +983,9 @@ class Channel(models.Model):
             msg = _("You are in a private conversation with <b>@%s</b>.") % (channel_partners[0].partner_id.name if channel_partners else _('Anonymous'))
         msg += _("""<br><br>
             Type <b>@username</b> to mention someone, and grab his attention.<br>
-            Type <b>#channel</b>.to mention a channel.<br>
+            Type <b>#channel</b> to mention a channel.<br>
             Type <b>/command</b> to execute a command.<br>
-            Type <b>:shortcut</b> to insert canned responses in your message.<br>""")
+            Type <b>:shortcut</b> to insert a canned response in your message.<br>""")
 
         self._send_transient_message(partner, msg)
 
@@ -1015,6 +1014,6 @@ class Channel(models.Model):
             msg = _("You are alone in this channel.")
         else:
             dots = "..." if len(members) != len(self.channel_partner_ids) - 1 else ""
-            msg = _("Users in this channel: %s %s and you.") % (", ".join(members), dots)
+            msg = _("Users in this channel: %(members)s %(dots)s and you.", members=", ".join(members), dots=dots)
 
         self._send_transient_message(partner, msg)

@@ -52,7 +52,8 @@ class Website(models.Model):
         return def_lang_id or self._active_languages()[0]
 
     name = fields.Char('Website Name', required=True)
-    domain = fields.Char('Website Domain')
+    domain = fields.Char('Website Domain',
+        help='Will be prefixed by http in canonical URLs if no scheme is specified')
     country_group_ids = fields.Many2many('res.country.group', 'website_country_group_rel', 'website_id', 'country_group_id',
                                          string='Country Groups', help='Used when multiple websites have the same domain.')
     company_id = fields.Many2one('res.company', string="Company", default=lambda self: self.env.company, required=True)
@@ -256,7 +257,7 @@ class Website(models.Model):
         homepage_page = Page.search([
             ('website_id', '=', self.id),
             ('key', '=', standard_homepage.key),
-        ])
+        ], limit=1)
         if not homepage_page:
             homepage_page = Page.create({
                 'website_published': True,
@@ -283,7 +284,7 @@ class Website(models.Model):
                 copy_menu(submenu, new_menu)
         for website in self:
             new_top_menu = top_menu.copy({
-                'name': _('Top Menu for Website %s') % website.id,
+                'name': _('Top Menu for Website %s', website.id),
                 'website_id': website.id,
             })
             for submenu in top_menu.child_id:
@@ -407,7 +408,7 @@ class Website(models.Model):
         for page in pages:
             dependencies.setdefault(page_key, [])
             dependencies[page_key].append({
-                'text': _('Page <b>%s</b> contains a link to this page') % page.url,
+                'text': _('Page <b>%s</b> contains a link to this page', page.url),
                 'item': page.name,
                 'link': page.url,
             })
@@ -435,7 +436,7 @@ class Website(models.Model):
             menu_key = _('Menus')
         for menu in menus:
             dependencies.setdefault(menu_key, []).append({
-                'text': _('This page is in the menu <b>%s</b>') % menu.name,
+                'text': _('This page is in the menu <b>%s</b>', menu.name),
                 'link': '/web#id=%s&view_type=form&model=website.menu' % menu.id,
                 'item': menu.name,
             })
@@ -471,7 +472,7 @@ class Website(models.Model):
         for p in pages:
             dependencies.setdefault(page_key, [])
             dependencies[page_key].append({
-                'text': _('Page <b>%s</b> is calling this file') % p.url,
+                'text': _('Page <b>%s</b> is calling this file', p.url),
                 'item': p.name,
                 'link': p.url,
             })
@@ -654,7 +655,7 @@ class Website(models.Model):
 
     @api.model
     def is_public_user(self):
-        return request.env.user.id == request.website.user_id.id
+        return request.env.user.id == request.website._get_cached('user_id')
 
     @api.model
     def viewref(self, view_id, raise_if_not_found=True):
@@ -670,7 +671,7 @@ class Website(models.Model):
             :param raise_if_not_found: should the method raise an error if no view found
             :return: The view record or empty recordset
         '''
-        View = self.env['ir.ui.view']
+        View = self.env['ir.ui.view'].sudo()
         view = View
         if isinstance(view_id, str):
             if 'website_id' in self._context:
@@ -700,7 +701,7 @@ class Website(models.Model):
 
     @tools.ormcache_context(keys=('website_id',))
     def _cache_customize_show_views(self):
-        views = self.env['ir.ui.view'].with_context(active_test=False).search([('customize_show', '=', True)])
+        views = self.env['ir.ui.view'].with_context(active_test=False).sudo().search([('customize_show', '=', True)])
         views = views.filter_duplicate()
         return {v.key: v.active for v in views}
 
@@ -760,7 +761,7 @@ class Website(models.Model):
         return all(p.name in rule._converters for p in params
                    if p.kind in supported_kinds and has_no_default(p))
 
-    def enumerate_pages(self, query_string=None, force=False):
+    def _enumerate_pages(self, query_string=None, force=False):
         """ Available pages in the website/CMS. This is mostly used for links
             generation and can be overridden by modules setting up new HTML
             controllers for dynamic pages (e.g. blog).
@@ -850,7 +851,7 @@ class Website(models.Model):
         if query_string:
             domain += [('url', 'like', query_string)]
 
-        pages = self.get_website_pages(domain)
+        pages = self._get_website_pages(domain)
 
         for page in pages:
             record = {'loc': page['url'], 'id': page['id'], 'name': page['name']}
@@ -860,15 +861,15 @@ class Website(models.Model):
                 record['lastmod'] = page['write_date'].date()
             yield record
 
-    def get_website_pages(self, domain=[], order='name', limit=None):
+    def _get_website_pages(self, domain=[], order='name', limit=None):
         domain += self.get_current_website().website_domain()
-        pages = self.env['website.page'].search(domain, order=order, limit=limit)
+        pages = self.env['website.page'].sudo().search(domain, order=order, limit=limit)
         return pages
 
     def search_pages(self, needle=None, limit=None):
         name = slugify(needle, max_length=50, path=True)
         res = []
-        for page in self.enumerate_pages(query_string=name, force=True):
+        for page in self._enumerate_pages(query_string=name, force=True):
             res.append(page)
             if len(res) == limit:
                 break
@@ -904,8 +905,8 @@ class Website(models.Model):
     @api.model
     def action_dashboard_redirect(self):
         if self.env.user.has_group('base.group_system') or self.env.user.has_group('website.group_website_designer'):
-            return self.env.ref('website.backend_dashboard').read()[0]
-        return self.env.ref('website.action_website').read()[0]
+            return self.env["ir.actions.actions"]._for_xml_id("website.backend_dashboard")
+        return self.env["ir.actions.actions"]._for_xml_id("website.action_website")
 
     def button_go_website(self):
         self._force()
@@ -1011,3 +1012,8 @@ class BaseModel(models.AbstractModel):
             return self.website_id._get_http_domain()
         else:
             return super(BaseModel, self).get_base_url()
+
+    def get_website_meta(self):
+        # dummy version of 'get_website_meta' above; this is a graceful fallback
+        # for models that don't inherit from 'website.seo.metadata'
+        return {}

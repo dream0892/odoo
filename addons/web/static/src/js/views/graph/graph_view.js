@@ -31,7 +31,7 @@ var GraphView = AbstractView.extend({
         Renderer: GraphRenderer,
     }),
     viewType: 'graph',
-    searchMenuTypes: ['filter', 'groupBy', 'timeRange', 'favorite'],
+    searchMenuTypes: ['filter', 'groupBy', 'comparison', 'favorite'],
 
     /**
      * @override
@@ -43,7 +43,7 @@ var GraphView = AbstractView.extend({
         let measure;
         const measures = {};
         const measureStrings = {};
-        const groupBys = [];
+        let groupBys = [];
         const groupableFields = {};
         this.fields.__count__ = { string: _t("Count"), type: 'integer' };
 
@@ -100,6 +100,20 @@ var GraphView = AbstractView.extend({
             }
         }
 
+        // Remove invisible fields from the measures
+        this.arch.children.forEach(field => {
+            let fieldName = field.attrs.name;
+            if (field.attrs.invisible && py.eval(field.attrs.invisible)) {
+                groupBys = groupBys.filter(groupBy => groupBy !== fieldName);
+                if (fieldName in groupableFields) {
+                    delete groupableFields[fieldName];
+                }
+                if (!additionalMeasures.includes(fieldName)) {
+                    delete measures[fieldName];
+                }
+            }
+        });
+
         const sortedMeasures = Object.values(measures).sort((a, b) => {
                 const descA = a.description.toLowerCase();
                 const descB = b.description.toLowerCase();
@@ -134,6 +148,7 @@ var GraphView = AbstractView.extend({
         this.rendererParams.disableLinking = !!JSON.parse(this.arch.attrs.disable_linking || '0');
 
         this.loadParams.mode = this.arch.attrs.type || 'bar';
+        this.loadParams.orderBy = this.arch.attrs.order;
         this.loadParams.measure = measure || '__count__';
         this.loadParams.groupBys = groupBys;
         this.loadParams.fields = this.fields;

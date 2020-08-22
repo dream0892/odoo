@@ -73,7 +73,7 @@ class HolidaysType(models.Model):
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
     responsible_id = fields.Many2one('res.users', 'Responsible',
         domain=lambda self: [('groups_id', 'in', self.env.ref('hr_holidays.group_hr_holidays_user').id)],
-        help="This user will be responsible for approving this type of times off. "
+        help="This user will be responsible for approving this type of time off. "
         "This is only used when validation is 'hr' or 'both'",)
     leave_validation_type = fields.Selection([
         ('no_validation', 'No Validation'),
@@ -257,7 +257,7 @@ class HolidaysType(models.Model):
         elif 'default_employee_id' in self._context:
             employee_id = self._context['default_employee_id']
         else:
-            employee_id = self.env['hr.employee'].search([('user_id', '=', self.env.user.id), ('company_id', '=', self.env.company.id)], limit=1).id
+            employee_id = self.env.user.employee_id.id
         return employee_id
 
     def _compute_leaves(self):
@@ -347,7 +347,7 @@ class HolidaysType(models.Model):
 
     def action_see_days_allocated(self):
         self.ensure_one()
-        action = self.env.ref('hr_holidays.hr_leave_allocation_action_all').read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id("hr_holidays.hr_leave_allocation_action_all")
         domain = [
             ('holiday_status_id', 'in', self.ids),
             ('holiday_type', '!=', 'employee'),
@@ -366,7 +366,7 @@ class HolidaysType(models.Model):
 
     def action_see_group_leaves(self):
         self.ensure_one()
-        action = self.env.ref('hr_holidays.hr_leave_action_all').read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id("hr_holidays.hr_leave_action_action_approve_department")
         action['domain'] = [
             ('holiday_status_id', '=', self.ids[0]),
             ('date_from', '>=', fields.Datetime.to_string(datetime.datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)))

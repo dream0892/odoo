@@ -4,11 +4,11 @@
 import datetime
 import random
 
-from odoo.addons.mass_mailing.tests.common import TestMassMailCommon
+from odoo.addons.mass_mailing.tests.common import MassMailCommon
 from odoo.addons.test_mail.tests.common import TestMailCommon
 
 
-class TestMassMailCommon(TestMassMailCommon, TestMailCommon):
+class TestMassMailCommon(MassMailCommon, TestMailCommon):
 
     @classmethod
     def setUpClass(cls):
@@ -25,9 +25,12 @@ class TestMassMailCommon(TestMassMailCommon, TestMailCommon):
     @classmethod
     def _create_test_blacklist_records(cls, model='mailing.test.blacklist', count=1):
         """ Helper to create data. Currently simple, to be improved. """
+        Model = cls.env[model]
+        email_field = 'email' if 'email' in Model else 'email_from'
+
         records = cls.env[model].create([{
             'name': 'TestRecord_%02d' % x,
-            'email_from': '"TestCustomer %02d" <test.record.%02d@test.example.com>' % (x, x),
+            email_field: '"TestCustomer %02d" <test.record.%02d@test.example.com>' % (x, x),
         } for x in range(0, count)])
         return records
 

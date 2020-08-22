@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-<template id="wysiwyg_iframe_editor_assets" name="Editor assets for wysiwyg iframe content">
+<template id="wysiwyg_iframe_editor_assets" name="Editor assets for wysiwyg iframe content" groups="base.group_user">
     <t t-call-assets="web.assets_common"/>
     <t t-call-assets="web.assets_frontend" t-js="false"/>
     <t t-call-assets="web_editor.assets_wysiwyg"/>
 </template>
 
-<template id="compiled_assets_wysiwyg" name="Wysiwyg Editor">
+<template id="compiled_assets_wysiwyg" name="Wysiwyg Editor" groups="base.group_user,base.group_portal">
     <t t-call-assets="web_editor.assets_wysiwyg"/>
 </template>
 
@@ -20,7 +20,8 @@
     <script type="text/javascript" src="/web_editor/static/lib/cropperjs/cropper.js"/>
     <script type="text/javascript" src="/web_editor/static/lib/jquery-cropper/jquery-cropper.js"/>
     <script type="text/javascript" src="/web_editor/static/lib/jQuery.transfo.js"/>
-    <script type="text/javascript" src="/web_editor/static/lib/nearest/jquery.nearest.js"/>
+    <script type="text/javascript" src="/web/static/lib/nearest/jquery.nearest.js"/>
+    <script type="text/javascript" src="/web_editor/static/lib/webgl-image-filter/webgl-image-filter.js"/>
 
     <!-- odoo utils -->
 
@@ -39,15 +40,15 @@
     <script type="text/javascript" src="/web_editor/static/src/js/editor/editor.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/editor/rte.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/editor/rte.summernote.js"/>
+    <script type="text/javascript" src="/web_editor/static/src/js/editor/image_processing.js"/>
 
     <!-- widgets & plugins -->
 
-    <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/image_optimize_dialog.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/media.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/dialog.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/alt_dialog.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/color_palette.js"/>
-    <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/crop_dialog.js"/>
+    <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/image_crop_widget.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/link_dialog.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/media_dialog.js"/>
     <script type="text/javascript" src="/web_editor/static/src/js/wysiwyg/widgets/widgets.js"/>
@@ -117,6 +118,12 @@
 <template id="_assets_primary_variables" inherit_id="web._assets_primary_variables">
     <xpath expr="//link[last()]" position="after">
         <link rel="stylesheet" type="text/scss" href="/web_editor/static/src/scss/web_editor.variables.scss"/>
+    </xpath>
+</template>
+
+<template id="_assets_13_0_color_system_support_primary_variables" inherit_id="web_editor._assets_primary_variables" active="False">
+    <xpath expr="//link[last()]" position="after">
+        <link rel="stylesheet" type="text/scss" href="/web_editor/static/src/scss/13_0_color_system_support_primary_variables.scss"/>
     </xpath>
 </template>
 
@@ -209,14 +216,10 @@
     If a color is no longer used you need to add the d-none class to it and not remove it from this file !!
     Else you will no longer be able to use them.
 -->
-<template id="web_editor.colorpicker" name="Color-Picker">
+<template id="web_editor.colorpicker" name="Color-Picker" groups="base.group_user">
     <colorpicker>
         <div class="o_colorpicker_section" data-name="theme">
-            <button data-color="alpha"></button>
-            <button data-color="beta"></button>
-            <button data-color="gamma"></button>
-            <button data-color="delta"></button>
-            <button data-color="epsilon"></button>
+            <button t-foreach="5" t-as="i" t-attf-data-color="o-color-#{i + 1}"></button>
         </div>
         <div class="o_colorpicker_section" data-name="common">
             <button data-color="black"></button>
@@ -231,7 +234,7 @@
             <button data-color="100"></button>
             <button data-color="white"></button>
         </div>
-        <div class="o_colorpicker_section" data-name="transparent_grayscale" data-display="Opacity Filters" data-icon-class="fa fa-eye-slash">
+        <div class="o_colorpicker_section" data-name="transparent_grayscale">
             <button data-color="black-15"></button>
             <button data-color="black-25"></button>
             <button data-color="black-50"></button>

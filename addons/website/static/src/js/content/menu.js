@@ -81,9 +81,10 @@ const BaseAnimatedHeader = animations.Animation.extend({
      */
     _updateMainPaddingTop: function () {
         this.headerHeight = this.$el.outerHeight();
-        if (this.isOverlayHeader) {
+        if (this.isOverlayHeader || this.$navbarCollapses.hasClass('show')) {
             return;
         }
+
         const headerSize = this.el.classList.contains('o_header_affixed');
         this.$main.css('padding-top', headerSize ? this.headerHeight : '');
     },
@@ -97,12 +98,23 @@ const BaseAnimatedHeader = animations.Animation.extend({
         this._transitionCount += addCount;
         this._transitionCount = Math.max(0, this._transitionCount);
 
-        // The normal case would be to have the transitionend event to be
-        // fired but we cannot rely on it, so we use a timeout as fallback.
-        clearTimeout(this._paddingLoopTimer);
+        // As long as we detected a transition start without its related
+        // transition end, keep updating the main padding top.
         if (this._transitionCount > 0) {
             window.requestAnimationFrame(() => this._updateMainPaddingTopLoop());
-            this._paddingLoopTimer = setTimeout(() => this._updateMainPaddingTopLoop(-1), 500);
+
+            // The normal case would be to have the transitionend event to be
+            // fired but we cannot rely on it, so we use a timeout as fallback.
+            if (addCount !== 0) {
+                clearTimeout(this._paddingLoopTimer);
+                this._paddingLoopTimer = setTimeout(() => {
+                    this._updateMainPaddingTopLoop(-this._transitionCount);
+                }, 500);
+            }
+        } else {
+            // When we detected all transitionend events, we need to stop the
+            // setTimeout fallback.
+            clearTimeout(this._paddingLoopTimer);
         }
     },
 
@@ -135,10 +147,7 @@ const BaseAnimatedHeader = animations.Animation.extend({
             this.headerIsScrolled = headerIsScrolled;
         }
 
-        // Reset opened menus
-        if (this.$navbarCollapses.hasClass('show')) {
-            return;
-        }
+        // Close opened menus
         this.$dropdowns.removeClass('show');
         this.$navbarCollapses.removeClass('show').attr('aria-expanded', false);
     },

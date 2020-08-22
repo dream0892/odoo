@@ -458,6 +458,10 @@ var RTEWidget = Widget.extend({
 
         if (initialActiveElement && initialActiveElement !== document.activeElement) {
             initialActiveElement.focus();
+            // Range inputs don't support selection
+            if (initialActiveElement.matches('input[type=range]')) {
+                return;
+            }
             try {
                 initialActiveElement.selectionStart = initialSelectionStart;
                 initialActiveElement.selectionEnd = initialSelectionEnd;
@@ -510,18 +514,11 @@ var RTEWidget = Widget.extend({
                     // new rejection with all relevant info
                     var id = _.uniqueId('carlos_danger_');
                     $el.addClass('o_dirty oe_carlos_danger ' + id);
-                    var html = Boolean(response.data.name);
-                    if (html) {
-                        var msg = $('<div/>', {text: response.message.data.message}).html();
-                        var data = msg.substring(3, msg.length  -2).split(/', u'/);
-                        response.message.data.message = '<b>' + data[0] + '</b>' + data[1];
-                    }
                     $('.o_editable.' + id)
                         .removeClass(id)
                         .popover({
-                            html: html,
                             trigger: 'hover',
-                            content: response.message.data.message,
+                            content: response.message.data.message || '',
                             placement: 'auto top',
                         })
                         .popover('show');
@@ -674,11 +671,12 @@ var RTEWidget = Widget.extend({
     _onMousedown: function (ev) {
         var $target = $(ev.target);
         var $editable = $target.closest('.o_editable');
+        var isLink = $target.is('a');
 
         if (this && this.$last && this.$last.length && this.$last[0] !== $target[0]) {
             $('.o_editable_date_field_linked').removeClass('o_editable_date_field_linked');
         }
-        if (!$editable.length || $.summernote.core.dom.isContentEditableFalse($target)) {
+        if (!$editable.length || (!isLink && $.summernote.core.dom.isContentEditableFalse($target))) {
             return;
         }
 
@@ -690,7 +688,7 @@ var RTEWidget = Widget.extend({
             $editable.find('[_moz_abspos]').removeAttr('_moz_abspos');
         });
 
-        if ($target.is('a')) {
+        if (isLink) {
             /**
              * Remove content editable everywhere and add it on the link only so that characters can be added
              * and removed at the start and at the end of it.
@@ -800,7 +798,7 @@ return {
 odoo.define('web_editor.rte.summernote_custom_colors', function (require) {
 'use strict';
 
-// These colors are already normalized as per normalizeCSSColor in web.ColorpickerDialog
+// These colors are already normalized as per normalizeCSSColor in web.Colorpicker
 return [
     ['#000000', '#424242', '#636363', '#9C9C94', '#CEC6CE', '#EFEFEF', '#F7F7F7', '#FFFFFF'],
     ['#FF0000', '#FF9C00', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#9C00FF', '#FF00FF'],

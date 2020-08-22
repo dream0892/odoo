@@ -4,6 +4,7 @@ odoo.define('pos_adyen.payment', function (require) {
 var core = require('web.core');
 var rpc = require('web.rpc');
 var PaymentInterface = require('point_of_sale.PaymentInterface');
+const { Gui } = require('point_of_sale.Gui');
 
 var _t = core._t;
 
@@ -206,6 +207,15 @@ var PaymentAdyen = PaymentInterface.extend({
                     var config = self.pos.config;
                     var payment_response = notification.SaleToPOIResponse.PaymentResponse;
                     var payment_result = payment_response.PaymentResult;
+
+                    var cashier_receipt = payment_response.PaymentReceipt.find(function (receipt) {
+                        return receipt.DocumentQualifier == 'CashierReceipt';
+                    });
+
+                    if (cashier_receipt) {
+                        line.set_cashier_receipt(self._convert_receipt_info(cashier_receipt.OutputContent.OutputText));
+                    }
+
                     var customer_receipt = payment_response.PaymentReceipt.find(function (receipt) {
                         return receipt.DocumentQualifier == 'CustomerReceipt';
                     });
@@ -271,12 +281,6 @@ var PaymentAdyen = PaymentInterface.extend({
         } else {
             line.set_payment_status('waitingCard');
 
-            // This is not great, the payment screen should be
-            // refactored so it calls render_paymentlines whenever a
-            // paymentline changes. This way the call to
-            // set_payment_status would re-render it automatically.
-            this.pos.chrome.gui.current_screen.render_paymentlines();
-
             var self = this;
             var res = new Promise(function (resolve, reject) {
                 // clear previous intervals just in case, otherwise
@@ -301,7 +305,7 @@ var PaymentAdyen = PaymentInterface.extend({
         if (!title) {
             title =  _t('Adyen Error');
         }
-        this.pos.gui.show_popup('error',{
+        Gui.showPopup('ErrorPopup',{
             'title': title,
             'body': msg,
         });

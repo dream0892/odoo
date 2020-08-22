@@ -23,13 +23,14 @@ class Job(models.Model):
         help="Address where employees are working")
     application_ids = fields.One2many('hr.applicant', 'job_id', "Applications")
     application_count = fields.Integer(compute='_compute_application_count', string="Application Count")
+    all_application_count = fields.Integer(compute='_compute_all_application_count', string="All Application Count")
     new_application_count = fields.Integer(
         compute='_compute_new_application_count', string="New Application",
         help="Number of applications that are new in the flow (typically at first step of the flow)")
     manager_id = fields.Many2one(
         'hr.employee', related='department_id.manager_id', string="Department Manager",
         readonly=True, store=True)
-    user_id = fields.Many2one('res.users', "Responsible", tracking=True)
+    user_id = fields.Many2one('res.users', "Recruiter", tracking=True)
     hr_responsible_id = fields.Many2one(
         'res.users', "HR Responsible", tracking=True,
         help="Person responsible of validating the employee's contracts.")
@@ -71,8 +72,14 @@ class Job(models.Model):
                 result[attachment.res_id] |= attachment
 
         for job in self:
-            job.document_ids = result[job.id]
+            job.document_ids = result.get(job.id, False)
             job.documents_count = len(job.document_ids)
+
+    def _compute_all_application_count(self):
+        read_group_result = self.env['hr.applicant'].with_context(active_test=False).read_group([('job_id', 'in', self.ids)], ['job_id'], ['job_id'])
+        result = dict((data['job_id'][0], data['job_id_count']) for data in read_group_result)
+        for job in self:
+            job.all_application_count = result.get(job.id, 0)
 
     def _compute_application_count(self):
         read_group_result = self.env['hr.applicant'].read_group([('job_id', 'in', self.ids)], ['job_id'], ['job_id'])
@@ -108,13 +115,21 @@ class Job(models.Model):
     @api.model
     def create(self, vals):
         vals['favorite_user_ids'] = vals.get('favorite_user_ids', []) + [(4, self.env.uid)]
-        return super(Job, self).create(vals)
+        new_job = super(Job, self).create(vals)
+        utm_linkedin = self.env.ref("utm.utm_source_linkedin", raise_if_not_found=False)
+        if utm_linkedin:
+            source_vals = {
+                'source_id': utm_linkedin.id,
+                'job_id': new_job.id,
+            }
+            self.env['hr.recruitment.source'].create(source_vals)
+        return new_job
 
     def _creation_subtype(self):
         return self.env.ref('hr_recruitment.mt_job_new')
 
     def action_get_attachment_tree_view(self):
-        action = self.env.ref('base.action_attachment').read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id("base.action_attachment")
         action['context'] = {
             'default_res_model': self._name,
             'default_res_id': self.ids[0]

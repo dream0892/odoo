@@ -15,8 +15,6 @@ description into a live application, able to interact with every model and
 records in the database.  It is even possible to use the web client to modify
 the interface of the web client.
 
-.. note:: An html version of all js docstrings in Odoo is available at:
-      :ref:`JS API <api/js>`
 
 Overview
 =========
@@ -1768,8 +1766,8 @@ order.
     Options:
 
     - website_path: (default:false) by default, the widget forces (if not already
-    the case) the href value to begin with http:// except if this option is set
-    to true, thus allowing redirections to the database's own website.
+      the case) the href value to begin with http:// except if this option is set
+      to true, thus allowing redirections to the database's own website.
 
     - Supported field types: *char*
 

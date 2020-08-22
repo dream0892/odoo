@@ -306,10 +306,9 @@
 
     <t t-name="wysiwyg.widgets.image.existing.attachment">
         <t t-set="isOptimized" t-value="!!attachment.original_id"/>
-        <div t-attf-class="o_existing_attachment_cell position-relative bg-light #{isOptimized and 'o_we_attachment_optimized d-none'}" t-att-data-id="attachment.id">
-            <i t-if="attachment.type === 'binary'" class="fa fa-cog o_existing_attachment_optimize p-2" title="Optimize" role="img" aria-label="Optimize"/>
+        <div t-attf-class="o_existing_attachment_cell position-relative bg-light #{isOptimized and 'o_we_attachment_optimized d-none' or ''} align-items-center justify-content-center" t-att-data-id="attachment.id">
             <t t-call="wysiwyg.widgets.file.existing.remove"/>
-            <div t-attf-class="d-flex align-items-center justify-content-center h-100 w-100">
+            <div class="o_we_media_dialog_img_wrapper">
                 <!-- 256 is 2 * ImageWidget.MIN_ROW_HEIGHT, hopefully the highest display width of any image -->
                 <img class="img img-fluid o_we_attachment_highlight" t-attf-src="#{attachment.image_src}?height=256" t-att-alt="attachment.name" t-att-title="attachment.name"/>
             </div>
@@ -396,29 +395,29 @@
                     <small class="text-muted">Accepts <b><i>Youtube</i></b>, <b><i>Vimeo</i></b>, <b><i>Dailymotion</i></b> and <b><i>Youku</i></b> videos</small>
                 </div>
                 <div class="o_video_dialog_options d-none mt-4">
-                    <div class="o_yt_option o_vim_option o_dm_option">
+                    <div class="o_youtube_option o_vimeo_option o_dailymotion_option">
                       <label class="o_switch mb0">
                         <input id="o_video_autoplay" type="checkbox"/><span/>
                         <span style="margin-right: 8px;">Autoplay</span>
                         <span class="small text-muted" style="margin-left: auto;">Videos are muted when autoplay is enabled</span>
                       </label>
                     </div>
-                    <div class="o_yt_option o_vim_option">
+                    <div class="o_youtube_option o_vimeo_option">
                         <label class="o_switch mb0"><input id="o_video_loop" type="checkbox"/><span/>Loop</label>
                     </div>
-                    <div class="o_yt_option o_dm_option">
+                    <div class="o_youtube_option o_dailymotion_option">
                         <label class="o_switch mb0"><input id="o_video_hide_controls" type="checkbox"/><span/>Hide player controls</label>
                     </div>
-                    <div class="o_yt_option">
+                    <div class="o_youtube_option">
                         <label class="o_switch mb0"><input id="o_video_hide_fullscreen" type="checkbox"/><span/>Hide fullscreen button</label>
                     </div>
-                    <div class="o_yt_option">
+                    <div class="o_youtube_option">
                         <label class="o_switch mb0"><input id="o_video_hide_yt_logo" type="checkbox"/><span/>Hide Youtube logo</label>
                     </div>
-                    <div class="o_dm_option">
+                    <div class="o_dailymotion_option">
                         <label class="o_switch mb0"><input id="o_video_hide_dm_logo" type="checkbox"/><span/>Hide Dailymotion logo</label>
                     </div>
-                    <div class="o_dm_option">
+                    <div class="o_dailymotion_option">
                         <label class="o_switch mb0"><input id="o_video_hide_dm_share" type="checkbox"/><span/>Hide sharing button</label>
                     </div>
                 </div>
@@ -459,42 +458,42 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label class="col-form-label col-md-3">Size</label>
-                    <div class="col-md-9">
-                        <select name="link_style_size" class="form-control link-style">
-                            <option value="sm">Small</option>
-                            <option value="" selected="selected">Medium</option>
-                            <option value="lg">Large</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group row">
-                    <label class="col-form-label col-md-3">Style</label>
-                    <div class="col-md-9">
-                        <select name="link_style_shape" class="form-control link-style">
-                            <option value="" selected="selected">Default</option>
-                            <option value="outline">Outline</option>
-                            <option value="rounded-circle">Rounded</option>
-                            <option value="outline,rounded-circle">Outline-Rounded</option>
-                            <option value="flat">Flat</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group row">
-                    <label class="col-form-label col-md-3">Color</label>
-                    <div class="col-md-9">
-                        <div class="o_link_dialog_color">
-                            <label role="button" t-attf-class="o_link_dialog_color_item o_btn_preview btn btn-link text-center" data-color="">
-                                <span>L</span>
-                                <input class="d-none link-style" name="link_style_color" type="radio" value=""/>
-                                <i class="fa"/>
-                            </label>
-                            <t t-foreach="['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'primary', 'secondary', 'success', 'info', 'warning', 'danger']" t-as="color">
-                                <label role="button" t-attf-class="o_link_dialog_color_item o_btn_preview btn btn-#{color}" t-attf-aria-label="Color for #{color}" t-attf-title="Color for #{color}">
-                                    <input type="radio" name="link_style_color" class="d-none link-style" t-att-value="color"/>
-                                    <i class="fa"/>
+                    <label class="col-form-label col-md-3">Type</label>
+                    <div class="col-md-9 d-flex align-items-center">
+                        <div t-attf-class="#{widget.colorCombinationClass ? ('p-2 ' + widget.colorCombinationClass) : ''}">
+                            <t t-foreach="widget.colorsData" t-as="colorData">
+                                <label role="button" class="m-0 mr-2">
+                                    <input type="radio" name="link_style_color" class="d-none link-style" t-att-value="colorData.type"/>
+                                    <span t-esc="colorData.label"
+                                            t-attf-class="o_btn_preview btn btn-sm btn-#{colorData.btnPreview} #{colorData.type ? '' : 'px-0'}"/>
                                 </label>
                             </t>
+                        </div>
+                    </div>
+                </div>
+                <div id="o_link_dialog_button_opts_collapse" class="collapse">
+                    <div class="form-group row">
+                        <label class="col-form-label col-md-3">Size</label>
+                        <div class="col-md-9">
+                            <select name="link_style_size" class="form-control link-style">
+                                <option value="sm">Small</option>
+                                <option value="" selected="selected">Medium</option>
+                                <option value="lg">Large</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-form-label col-md-3">Style</label>
+                        <div class="col-md-9">
+                            <select name="link_style_shape" class="form-control link-style">
+                                <option value="" selected="selected">Default</option>
+                                <option value="rounded-circle">Default + Rounded</option>
+                                <option value="outline">Outline</option>
+                                <option value="outline,rounded-circle">Outline + Rounded</option>
+                                <option value="fill">Fill</option>
+                                <option value="fill,rounded-circle">Fill + Rounded</option>
+                                <option value="flat">Flat</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -511,7 +510,8 @@
             <div class="col-lg-4 o_link_dialog_preview">
                 <div class="form-group text-center">
                     <label>Preview</label>
-                    <div style="overflow-x: auto; max-width: 100%; max-height: 200px;">
+                    <div t-attf-class="#{widget.colorCombinationClass ? ('p-2 ' + widget.colorCombinationClass) : ''}"
+                         style="overflow-x: auto; max-width: 100%; max-height: 200px;">
                         <a href="#" id="link-preview" aria-label="Preview" title="Preview"/>
                     </div>
                 </div>
@@ -519,46 +519,40 @@
         </div>
     </div>
 
-    <!-- Crop Image Dialog (allows to crop image on the page) -->
-    <div t-name="wysiwyg.widgets.crop_image" class="o_crop_image_dialog">
-        <div t-if="widget.imageData.isExternalImage" class="alert alert-warning text-center" role="alert">
-            <i class="fa fa-exclamation-triangle fa-2x"/>
-            <h4>This image is an external image</h4>
-            <p>
-                This type of image is not supported for cropping.<br/>
-                If you want to crop it, please first download it from the original source and upload it in Odoo.
-            </p>
+    <!-- ImageCropWidget controls (allows to crop images on the page) -->
+    <div t-name="wysiwyg.widgets.crop" class="o_we_crop_widget" contenteditable="false">
+        <div class="o_we_cropper_wrapper">
+            <img class="o_we_cropper_img"/>
+            <div class="o_we_crop_buttons text-center mt16 position-absolute o_we_no_overlay" contenteditable="false">
+                <div class="btn-group btn-group-toggle" title="Aspect Ratio" data-toggle="buttons">
+                    <t t-foreach="widget.aspectRatios" t-as="ratio">
+                        <t t-set="is_active" t-value="ratio.value === widget.aspectRatio"/>
+                        <label t-attf-class="{is_active and 'active' or ''}" data-action="ratio" t-att-data-value="ratio">
+                            <input type="radio" /><t t-esc="ratio_value.label"/>
+                        </label>
+                    </t>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" title="Zoom In" data-action="zoom" data-value="0.1"><i class="fa fa-fw fa-search-plus"/></button>
+                    <button type="button" title="Zoom Out" data-action="zoom" data-value="-0.1"><i class="fa fa-fw fa-search-minus"/></button>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" title="Rotate Left" data-action="rotate" data-value="-90"><i class="fa fa-fw fa-rotate-left"/></button>
+                    <button type="button" title="Rotate Right" data-action="rotate" data-value="90"><i class="fa fa-fw fa-rotate-right"/></button>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" title="Flip Horizontal" data-action="flip" data-scale-direction="scaleX"><i class="fa fa-fw fa-arrows-h"/></button>
+                    <button type="button" title="Flip Vertical" data-action="flip" data-scale-direction="scaleY"><i class="fa fa-fw fa-arrows-v"/></button>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" title="Reset Image" data-action="reset"><i class="fa fa-refresh"/> Reset Image</button>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" title="Apply" data-action="apply" class="btn btn-primary"><i class="fa fa-check"/> Apply</button>
+                    <button type="button" title="Discard" data-action="discard" class="btn btn-danger"><i class="fa fa-times"/> Discard</button>
+                </div>
+            </div>
         </div>
-        <t t-else="">
-           <div class="o_crop_area">
-                <img class="img img-fluid o_cropper_image" t-att-src="widget.imageData.originalSrc"/>
-           </div>
-           <div class="o_crop_options text-center mt16">
-               <div class="btn-group btn-group-toggle" title="Aspect Ratio" data-toggle="buttons">
-                   <t t-foreach="widget.aspectRatioList" t-as="ratio">
-                       <t t-set="is_active" t-value="ratio[1] === widget.imageData.aspectRatio"/>
-                       <label t-attf-class="btn btn-secondary#{is_active and ' active' or ''}" data-event="ratio" t-att-data-label="ratio[1]" t-att-data-value="ratio[2]">
-                           <input type="radio" /><t t-esc="ratio[0]"/>
-                       </label>
-                   </t>
-               </div>
-               <div class="btn-group" role="group">
-                   <button type="button" class="btn btn-secondary" title="Zoom In" data-event="zoom" data-value="0.1"><i class="fa fa-search-plus"/></button>
-                   <button type="button" class="btn btn-secondary" title="Zoom Out" data-event="zoom" data-value="-0.1"><i class="fa fa-search-minus"/></button>
-               </div>
-               <div class="btn-group" role="group">
-                   <button type="button" class="btn btn-secondary" title="Rotate Left" data-event="rotate" data-value="-45"><i class="fa fa-rotate-left"/></button>
-                   <button type="button" class="btn btn-secondary" title="Rotate Right" data-event="rotate" data-value="45"><i class="fa fa-rotate-right"/></button>
-               </div>
-               <div class="btn-group" role="group">
-                   <button type="button" class="btn btn-secondary" title="Flip Horizontal" data-event="flip" data-value="horizontal" data-x="1"><i class="fa fa-arrows-h"/></button>
-                   <button type="button" class="btn btn-secondary" title="Flip Vertical" data-event="flip" data-value="vertical" data-y="1"><i class="fa fa-arrows-v"/></button>
-               </div>
-               <div class="btn-group" role="group">
-                   <button type="button" class="btn btn-secondary" title="Reset Image" data-event="reset"><i class="fa fa-refresh"/> Reset Image</button>
-               </div>
-           </div>
-       </t>
     </div>
 
 </templates>

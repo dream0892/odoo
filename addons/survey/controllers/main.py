@@ -318,22 +318,22 @@ class Survey(http.Controller):
 
         survey_content = False
         if answer_sudo.state == 'done':
-            survey_content = request.env.ref('survey.survey_fill_form_done').render(survey_data)
+            survey_content = request.env.ref('survey.survey_fill_form_done')._render(survey_data)
         else:
-            survey_content = request.env.ref('survey.survey_fill_form_in_progress').render(survey_data)
+            survey_content = request.env.ref('survey.survey_fill_form_in_progress')._render(survey_data)
 
         survey_progress = False
         if answer_sudo.state == 'in_progress' and not survey_data.get('question', request.env['survey.question']).is_page:
             if survey_sudo.questions_layout == 'page_per_section':
                 page_ids = survey_sudo.page_ids.ids
-                survey_progress = request.env.ref('survey.survey_progression').render({
+                survey_progress = request.env.ref('survey.survey_progression')._render({
                     'survey': survey_sudo,
                     'page_ids': page_ids,
                     'page_number': page_ids.index(survey_data['page'].id) + (1 if survey_sudo.progression_mode == 'number' else 0)
                 })
             elif survey_sudo.questions_layout == 'page_per_question':
                 page_ids = survey_sudo.question_ids.ids
-                survey_progress = request.env.ref('survey.survey_progression').render({
+                survey_progress = request.env.ref('survey.survey_progression')._render({
                     'survey': survey_sudo,
                     'page_ids': page_ids,
                     'page_number': page_ids.index(survey_data['question'].id)
@@ -342,7 +342,7 @@ class Survey(http.Controller):
         return {
             'survey_content': survey_content,
             'survey_progress': survey_progress,
-            'survey_navigation': request.env.ref('survey.survey_navigation').render(survey_data),
+            'survey_navigation': request.env.ref('survey.survey_navigation')._render(survey_data),
         }
 
     @http.route('/survey/<string:survey_token>/<string:answer_token>', type='http', auth='public', website=True)
@@ -548,16 +548,15 @@ class Survey(http.Controller):
 
         survey_sudo, answer_sudo = access_data['survey_sudo'], access_data['answer_sudo']
 
-        if survey_sudo.scoring_type == 'scoring_without_answers':
-            return request.render("survey.survey_403_page", {'survey': survey_sudo})
-
         return request.render('survey.survey_page_print', {
+            'is_html_empty': is_html_empty,
             'review': review,
             'survey': survey_sudo,
-            'answer': answer_sudo,
+            'answer': answer_sudo if survey_sudo.scoring_type != 'scoring_without_answers' else answer_sudo.browse(),
+            'questions_to_display': answer_sudo._get_print_questions(),
             'scoring_display_correction': survey_sudo.scoring_type == 'scoring_with_answers' and answer_sudo,
             'format_datetime': lambda dt: format_datetime(request.env, dt, dt_format=False),
-            'format_date': lambda date: format_date(request.env, date)
+            'format_date': lambda date: format_date(request.env, date),
         })
 
     @http.route(['/survey/<model("survey.survey"):survey>/get_certification_preview'], type="http", auth="user", methods=['GET'], website=True)
@@ -629,7 +628,7 @@ class Survey(http.Controller):
         return request.render('survey.survey_page_statistics', template_values)
 
     def _generate_report(self, user_input, download=True):
-        report = request.env.ref('survey.certification_report').sudo().render_qweb_pdf([user_input.id], data={'report_type': 'pdf'})[0]
+        report = request.env.ref('survey.certification_report').sudo()._render_qweb_pdf([user_input.id], data={'report_type': 'pdf'})[0]
 
         report_content_disposition = content_disposition('Certification.pdf')
         if not download:
@@ -642,6 +641,20 @@ class Survey(http.Controller):
             ('Content-Length', len(report)),
             ('Content-Disposition', report_content_disposition),
         ])
+
+    def _get_user_input_domain(self, survey, line_filter_domain, **post):
+        user_input_domain = ['&', ('test_entry', '=', False), ('survey_id', '=', survey.id)]
+        if line_filter_domain:
+            matching_line_ids = request.env['survey.user_input.line'].sudo().search(line_filter_domain).ids
+            user_input_domain = expression.AND([
+                [('user_input_line_ids', 'in', matching_line_ids)],
+                user_input_domain
+            ])
+        if post.get('finished'):
+            user_input_domain = expression.AND([[('state', '=', 'done')], user_input_domain])
+        else:
+            user_input_domain = expression.AND([[('state', '!=', 'new')], user_input_domain])
+        return user_input_domain
 
     def _extract_filters_data(self, survey, post):
         search_filters = []
@@ -670,17 +683,7 @@ class Survey(http.Controller):
         if line_choices:
             line_filter_domain = expression.AND([[('suggested_answer_id', 'in', line_choices)], line_filter_domain])
 
-        user_input_domain = ['&', ('test_entry', '=', False), ('survey_id', '=', survey.id)]
-        if line_filter_domain:
-            matching_line_ids = request.env['survey.user_input.line'].sudo().search(line_filter_domain).ids
-            user_input_domain = expression.AND([
-                [('user_input_line_ids', 'in', matching_line_ids)],
-                user_input_domain
-            ])
-        if post.get('finished'):
-            user_input_domain = expression.AND([[('state', '=', 'done')], user_input_domain])
-        else:
-            user_input_domain = expression.AND([[('state', '!=', 'new')], user_input_domain])
+        user_input_domain = self._get_user_input_domain(survey, line_filter_domain, **post)
         user_input_lines = request.env['survey.user_input'].sudo().search(user_input_domain).mapped('user_input_line_ids')
 
         return user_input_lines, search_filters

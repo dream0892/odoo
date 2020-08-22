@@ -27,6 +27,14 @@ window.addEventListener('unhandledrejection', ev =>
 
 let active = true;
 
+// Note: we already have this function in browser_detection.js but browser_detection.js
+// is in assets_backend while crash_managere.js is in common so it will have dependency
+// of file browser_detection.js which will not be available in frontend, so copy function here
+const isBrowserChrome = function () {
+    return $.browser.chrome && // depends on jquery 1.x, removed in jquery 2 and above
+        navigator.userAgent.toLocaleLowerCase().indexOf('edge') === -1; // as far as jquery is concerned, Edge is chrome
+};
+
 /**
  * An extension of Dialog Widget to render the warnings and errors on the website.
  * Extend it with your template of choice like ErrorDialog/WarningDialog
@@ -141,7 +149,17 @@ var CrashManager = AbstractService.extend({
         // promise has been rejected due to a crash
         core.bus.on('crash_manager_unhandledrejection', this, function (ev) {
             if (ev.reason && ev.reason instanceof Error) {
-                var traceback = ev.reason.stack;
+                // Error.prototype.stack is non-standard.
+                // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
+                // However, most engines provide an implementation.
+                // In particular, Chrome formats the contents of Error.stack
+                // https://v8.dev/docs/stack-trace-api#compatibility
+                let traceback;
+                if (isBrowserChrome()) {
+                    traceback = ev.reason.stack;
+                } else {
+                    traceback = `${_t("Error:")} ${ev.reason.message}\n${ev.reason.stack}`;
+                }
                 self.show_error({
                     type: _t("Odoo Client Error"),
                     message: '',
@@ -222,7 +240,12 @@ var CrashManager = AbstractService.extend({
             return;
         }
         var message = error.data ? error.data.message : error.message;
-        var title = _.str.capitalize(error.type) || _t("Something went wrong !");
+        var title = _t("Something went wrong !");
+        if (error.type) {
+            title = _.str.capitalize(error.type);
+        } else if (error.data && error.data.title) {
+            title = _.str.capitalize(error.data.title);
+        }
         return this._displayWarning(message, title, options);
     },
     show_error: function (error) {
@@ -354,7 +377,18 @@ core.crash_registry.add('odoo.exceptions.RedirectWarning', RedirectWarningHandle
 function session_expired(cm) {
     return {
         display: function () {
-            cm.show_warning({type: _t("Odoo Session Expired"), message: _t("Your Odoo session expired. Please refresh the current web page.")});
+            const notif = {
+                type: _t("Odoo Session Expired"),
+                message: _t("Your Odoo session expired. The current page is about to be refreshed."),
+            };
+            const options = {
+                buttons: [{
+                    text: _t("Ok"),
+                    click: () => window.location.reload(true),
+                    close: true
+                }],
+            };
+            cm.show_warning(notif, options);
         }
     };
 }

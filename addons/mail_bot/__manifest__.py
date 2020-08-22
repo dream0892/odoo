@@ -3,7 +3,7 @@
 
 {
     'name': 'OdooBot',
-    'version': '1.0',
+    'version': '1.1',
     'category': 'Productivity/Discuss',
     'summary': 'Add OdooBot in discussions',
     'description': "",
@@ -11,7 +11,6 @@
     'depends': ['mail'],
     'installable': True,
     'application': False,
-    'auto_install': True,
     'data': [
         'views/assets.xml',
         'views/res_users_views.xml',
@@ -21,6 +20,10 @@
         'data/mailbot_demo.xml',
     ],
     'qweb': [
-        'views/discuss.xml',
+        'static/src/bugfix/bugfix.xml',
+        'static/src/components/messaging_menu/messaging_menu.xml',
+        'static/src/components/notification_alert/notification_alert.xml',
+        'static/src/components/notification_list/notification_list.xml',
+        'static/src/components/notification_request/notification_request.xml',
     ],
 }

@@ -73,7 +73,7 @@ class Pricelist(models.Model):
             # regular search() to apply ACLs - may limit results below limit in some cases
             pricelist_ids = self._search([('id', 'in', ids)], limit=limit, access_rights_uid=name_get_uid)
             if pricelist_ids:
-                return models.lazy_name_get(self.browse(pricelist_ids).with_user(name_get_uid))
+                return pricelist_ids
         return super(Pricelist, self)._name_search(name, args, operator=operator, limit=limit, name_get_uid=name_get_uid)
 
     def _compute_price_rule_multi(self, products_qty_partner, date=False, uom_id=False):
@@ -340,7 +340,7 @@ class Pricelist(models.Model):
         pl_domain = self._get_partner_pricelist_multi_search_domain_hook(company_id)
 
         # if no specific property, try to find a fitting pricelist
-        result = Property.get_multi('property_product_pricelist', Partner._name, partner_ids)
+        result = Property._get_multi('property_product_pricelist', Partner._name, partner_ids)
 
         remaining_partner_ids = [pid for pid, val in result.items() if not val or
                                  not val._get_partner_pricelist_multi_filter_hook()]
@@ -348,7 +348,7 @@ class Pricelist(models.Model):
             # get fallback pricelist when no pricelist for a given country
             pl_fallback = (
                 Pricelist.search(pl_domain + [('country_group_ids', '=', False)], limit=1) or
-                Property.get('property_product_pricelist', 'res.partner') or
+                Property._get('property_product_pricelist', 'res.partner') or
                 Pricelist.search(pl_domain, limit=1)
             )
             # group partners by country, and find a pricelist for each country
@@ -408,7 +408,7 @@ class PricelistItem(models.Model):
              "Expressed in the default unit of measure of the product.")
     applied_on = fields.Selection([
         ('3_global', 'All Products'),
-        ('2_product_category', ' Product Category'),
+        ('2_product_category', 'Product Category'),
         ('1_product', 'Product'),
         ('0_product_variant', 'Product Variant')], "Apply On",
         default='3_global', required=True,
@@ -519,9 +519,9 @@ class PricelistItem(models.Model):
                         ),
                     )
             elif item.compute_price == 'percentage':
-                item.price = _("%s %% discount") % (item.percent_price)
+                item.price = _("%s %% discount", item.percent_price)
             else:
-                item.price = _("%s %% discount and %s surcharge") % (item.price_discount, item.price_surcharge)
+                item.price = _("%(percentage)s %% discount and %(price)s surcharge", percentage=item.price_discount, price=item.price_surcharge)
 
     @api.onchange('compute_price')
     def _onchange_compute_price(self):

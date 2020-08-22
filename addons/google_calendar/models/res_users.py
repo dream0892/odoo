@@ -3,7 +3,7 @@
 
 import logging
 import requests
-from addons.google_calendar.models.google_sync import google_calendar_token
+from odoo.addons.google_calendar.models.google_sync import google_calendar_token
 from datetime import timedelta
 
 
@@ -11,7 +11,7 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 from odoo.loglevels import exception_to_unicode
 from odoo.addons.google_account.models.google_service import GOOGLE_TOKEN_ENDPOINT
-from addons.google_calendar.utils.google_calendar import GoogleCalendarService, InvalidSyncToken
+from odoo.addons.google_calendar.utils.google_calendar import GoogleCalendarService, InvalidSyncToken
 
 _logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class User(models.Model):
                 with self.pool.cursor() as cr:
                     self.env.user.with_env(self.env(cr=cr)).write({'google_calendar_rtoken': False})
             error_key = error.response.json().get("error", "nc")
-            error_msg = _("Something went wrong during your token generation. Maybe your Authorization Code is invalid or already expired [%s]") % error_key
+            error_msg = _("Something went wrong during your token generation. Maybe your Authorization Code is invalid or already expired [%s]", error_key)
             raise UserError(error_msg)
 
     def _sync_google_calendar(self, calendar_service: GoogleCalendarService):

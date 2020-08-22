@@ -325,6 +325,11 @@ class IrModuleModule(models.Model):
 
             :param website: ``website`` model for which the themes have to be removed
         """
+        # _theme_remove is the entry point of any change of theme for a website
+        # (either removal or installation of a theme and its dependencies). In
+        # either case, we need to reset some default configuration before.
+        self.env['theme.utils'].with_context(website_id=website.id)._reset_default_config()
+
         if not website.theme_id:
             return
 
@@ -382,7 +387,7 @@ class IrModuleModule(models.Model):
     def update_theme_images(self):
         IrAttachment = self.env['ir.attachment']
         existing_urls = IrAttachment.search_read([['res_model', '=', self._name], ['type', '=', 'url']], ['url'])
-        existing_urls = [url_wrapped['url'] for url_wrapped in existing_urls]
+        existing_urls = {url_wrapped['url'] for url_wrapped in existing_urls}
 
         themes = self.env['ir.module.module'].with_context(active_test=False).search([
             ('category_id', 'child_of', self.env.ref('base.module_category_theme').id),
@@ -392,7 +397,7 @@ class IrModuleModule(models.Model):
             terp = self.get_module_info(theme.name)
             images = terp.get('images', [])
             for image in images:
-                image_path = os.path.join(theme.name, image)
+                image_path = '/' + os.path.join(theme.name, image)
                 if image_path not in existing_urls:
                     image_name = os.path.basename(image_path)
                     IrAttachment.create({

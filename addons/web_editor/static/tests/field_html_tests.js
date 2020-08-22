@@ -151,7 +151,7 @@ QUnit.module('web_editor', {}, function () {
                         "className": undefined,
                         "message": "<ul><li>Header</li></ul>",
                         "sticky": undefined,
-                        "title": "The following fields are invalid:",
+                        "title": "Invalid fields:",
                         "type": "danger"
                       });
                 }
@@ -176,6 +176,13 @@ QUnit.module('web_editor', {}, function () {
                     '</form>',
                 res_id: 1,
             });
+
+            // Summernote needs a RootWidget to set as parent of the ColorPaletteWidget. In the
+            // tests, there is no RootWidget, so we set it here to the parent of the form view, which
+            // can act as RootWidget, as it will honor rpc requests correctly (to the MockServer).
+            const rootWidget = odoo.__DEBUG__.services['root.widget'];
+            odoo.__DEBUG__.services['root.widget'] = form.getParent();
+
             await testUtils.form.clickEdit(form);
             var $field = form.$('.oe_form_field[name="body"]');
 
@@ -201,7 +208,7 @@ QUnit.module('web_editor', {}, function () {
             assert.ok($field.find('.note-back-color-preview').hasClass('show'),
                 "should display the color picker");
 
-            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview button[style="background-color:#00FFFF;"]'));
+            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview .o_we_color_btn[style="background-color:#00FFFF;"]'));
 
             assert.ok(!$field.find('.note-back-color-preview').hasClass('show'),
                 "should close the color picker");
@@ -227,12 +234,13 @@ QUnit.module('web_editor', {}, function () {
             // text is selected
 
             await openColorpicker('.note-toolbar .note-back-color-preview');
-            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview button.bg-gamma'));
+            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview .o_we_color_btn.bg-o-color-3'));
 
             assert.strictEqual($field.find('.note-editable').html(),
-                '<p>t<font style="background-color: rgb(0, 255, 255);">oto t</font><font style="" class="bg-gamma">oto&nbsp;</font><font class="bg-gamma" style="">to</font>to</p><p>tata</p>',
+                '<p>t<font style="background-color: rgb(0, 255, 255);">oto t</font><font style="" class="bg-o-color-3">oto&nbsp;</font><font class="bg-o-color-3" style="">to</font>to</p><p>tata</p>',
                 "should have rendered the field correctly in edit");
 
+            odoo.__DEBUG__.services['root.widget'] = rootWidget;
             form.destroy();
         });
 
@@ -253,7 +261,7 @@ QUnit.module('web_editor', {}, function () {
                             return Promise.resolve();
                         }
                     }
-                    if (route.indexOf('/web_editor/static/src/img/') === 0) {
+                    if (route.indexOf('/web/static/src/img/transparent.png') === 0) {
                         return Promise.resolve();
                     }
                     if (route.indexOf('/web_unsplash/fetch_images') === 0) {
@@ -284,7 +292,7 @@ QUnit.module('web_editor', {}, function () {
             await testUtils.dom.click($('.modal #editor-media-image .o_existing_attachment_cell:first').removeClass('d-none'));
 
             var $editable = form.$('.oe_form_field[name="body"] .note-editable');
-            assert.ok($editable.find('img')[0].dataset.src.includes('/web_editor/static/src/img/transparent.png'),
+            assert.ok($editable.find('img')[0].dataset.src.includes('/web/static/src/img/transparent.png'),
                 "should have the image in the dom");
 
             testUtils.mock.unpatch(MediaDialog);
@@ -361,7 +369,7 @@ QUnit.module('web_editor', {}, function () {
                 mockRPC: function (route, args) {
                     if (args.method === "write") {
                         assert.strictEqual(args.args[1].body,
-                            '<p>t<font class="bg-gamma">oto toto&nbsp;</font>toto</p><p>tata</p>',
+                            '<p>t<font class="bg-o-color-3">oto toto&nbsp;</font>toto</p><p>tata</p>',
                             "should save the content");
 
                     }
@@ -376,8 +384,17 @@ QUnit.module('web_editor', {}, function () {
             Wysiwyg.setRange(pText, 1, pText, 10);
             // text is selected
 
-            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview button:first'));
-            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview button.bg-gamma'));
+            async function openColorpicker(selector) {
+                const $colorpicker = $field.find(selector);
+                const openingProm = new Promise(resolve => {
+                    $colorpicker.one('shown.bs.dropdown', () => resolve());
+                });
+                await testUtils.dom.click($colorpicker.find('button:first'));
+                return openingProm;
+            }
+
+            await openColorpicker('.note-toolbar .note-back-color-preview');
+            await testUtils.dom.click($field.find('.note-toolbar .note-back-color-preview .o_we_color_btn.bg-o-color-3'));
 
             await testUtils.form.clickSave(form);
 

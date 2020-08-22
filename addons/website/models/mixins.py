@@ -23,6 +23,7 @@ class SeoMetadata(models.AbstractModel):
     website_meta_description = fields.Text("Website meta description", translate=True)
     website_meta_keywords = fields.Char("Website meta keywords", translate=True)
     website_meta_og_img = fields.Char("Website opengraph image")
+    seo_name = fields.Char("Seo name", translate=True)
 
     def _compute_is_seo_optimized(self):
         for record in self:
@@ -105,7 +106,7 @@ class WebsiteCoverPropertiesMixin(models.AbstractModel):
 
     def _default_cover_properties(self):
         return {
-            "background_color_class": "bg-secondary",
+            "background_color_class": "o_cc3",
             "background-image": "none",
             "opacity": "0.2",
             "resize_class": "o_half_screen_height",

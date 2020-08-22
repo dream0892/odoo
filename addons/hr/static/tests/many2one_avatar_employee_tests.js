@@ -1,20 +1,23 @@
 odoo.define('hr.Many2OneAvatarEmployeeTests', function (require) {
 "use strict";
 
+const { afterEach, beforeEach, start } = require('mail/static/src/utils/test_utils.js');
+
 const FormView = require('web.FormView');
 const KanbanView = require('web.KanbanView');
 const ListView = require('web.ListView');
 const { Many2OneAvatarEmployee } = require('hr.Many2OneAvatarEmployee');
-const { createView, dom, mock } = require('web.test_utils');
-
+const { dom, mock } = require('web.test_utils');
 
 QUnit.module('hr', {}, function () {
     QUnit.module('Many2OneAvatarEmployee', {
-        beforeEach: function () {
+        beforeEach() {
+            beforeEach(this);
+
             // reset the cache before each test
             Many2OneAvatarEmployee.prototype.partnerIds = {};
 
-            this.data = {
+            Object.assign(this.data, {
                 'foo': {
                     fields: {
                         employee_id: { string: "Employee", type: 'many2one', relation: 'hr.employee' },
@@ -34,40 +37,34 @@ QUnit.module('hr', {}, function () {
                     records: [{
                         id: 11,
                         name: "Mario",
-                        user_partner_id: 1,
+                        user_partner_id: 11,
                     }, {
                         id: 7,
                         name: "Luigi",
-                        user_partner_id: 2,
+                        user_partner_id: 12,
                     }, {
                         id: 23,
                         name: "Yoshi",
-                        user_partner_id: 3,
+                        user_partner_id: 13,
                     }],
                 },
-                'res.partner': {
-                    fields: {
-                        display_name: { string: "Name", type: "char" },
-                    },
-                    records: [{
-                        id: 1,
-                        display_name: "Partner 1",
-                    }, {
-                        id: 2,
-                        display_name: "Partner 2",
-                    }, {
-                        id: 3,
-                        display_name: "Partner 3",
-                    }],
-                },
-            };
+            });
+            this.data['res.partner'].records.push(
+                { id: 11, display_name: "Mario" },
+                { id: 12, display_name: "Luigi" },
+                { id: 13, display_name: "Yoshi" }
+            );
+        },
+        afterEach() {
+            afterEach(this);
         },
     });
 
     QUnit.test('many2one_avatar_employee widget in list view', async function (assert) {
-        assert.expect(7);
+        assert.expect(4);
 
-        const list = await createView({
+        const { widget: list } = await start({
+            hasView: true,
             View: ListView,
             model: 'foo',
             data: this.data,
@@ -80,12 +77,6 @@ QUnit.module('hr', {}, function () {
             },
         });
 
-        mock.intercept(list, 'call_service', ev => {
-            if (ev.data.service === 'mail_service') {
-                assert.step(`call service ${ev.data.method} ${ev.data.args[0]}`);
-            }
-        }, true);
-
         assert.strictEqual(list.$('.o_data_cell span').text(), 'MarioLuigiMarioYoshi');
 
         await dom.click(list.$('.o_data_cell:nth(0) .o_m2o_avatar'));
@@ -95,10 +86,10 @@ QUnit.module('hr', {}, function () {
 
         assert.verifySteps([
             'read hr.employee 11',
-            'call service openDMChatWindow 1',
+            // 'call service openDMChatWindow 1',
             'read hr.employee 7',
-            'call service openDMChatWindow 2',
-            'call service openDMChatWindow 1',
+            // 'call service openDMChatWindow 2',
+            // 'call service openDMChatWindow 1',
         ]);
 
         list.destroy();
@@ -107,7 +98,8 @@ QUnit.module('hr', {}, function () {
     QUnit.test('many2one_avatar_employee widget in kanban view', async function (assert) {
         assert.expect(6);
 
-        const kanban = await createView({
+        const { widget: kanban } = await start({
+            hasView: true,
             View: KanbanView,
             model: 'foo',
             data: this.data,
@@ -137,7 +129,8 @@ QUnit.module('hr', {}, function () {
         assert.expect(5);
 
         this.data['hr.employee'].records[0].user_partner_id = false;
-        const form = await createView({
+        const { widget: form } = await start({
+            hasView: true,
             View: FormView,
             model: 'foo',
             data: this.data,
@@ -152,11 +145,8 @@ QUnit.module('hr', {}, function () {
         });
 
         mock.intercept(form, 'call_service', (ev) => {
-            if (ev.data.service === 'mail_service') {
-                throw new Error('should not call mail_service');
-            }
             if (ev.data.service === 'notification') {
-                assert.step(`display notification "${ev.data.args[0].title}"`);
+                assert.step(`display notification "${ev.data.args[0].message}"`);
             }
         }, true);
 
@@ -167,7 +157,7 @@ QUnit.module('hr', {}, function () {
         assert.verifySteps([
             'read foo 1',
             'read hr.employee 11',
-            'display notification "No user to chat with"',
+            'display notification "You can only chat with employees that have a dedicated user"',
         ]);
 
         form.destroy();
@@ -176,7 +166,9 @@ QUnit.module('hr', {}, function () {
     QUnit.test('many2one_avatar_employee: click on self', async function (assert) {
         assert.expect(5);
 
-        const form = await createView({
+        this.data.currentPartnerId = 11;
+        const { widget: form } = await start({
+            hasView: true,
             View: FormView,
             model: 'foo',
             data: this.data,
@@ -188,17 +180,14 @@ QUnit.module('hr', {}, function () {
                 return this._super(...arguments);
             },
             session: {
-                partner_id: 1,
+                partner_id: this.data.currentPartnerId,
             },
             res_id: 1,
         });
 
         mock.intercept(form, 'call_service', (ev) => {
-            if (ev.data.service === 'mail_service') {
-                throw new Error('should not call mail_service');
-            }
             if (ev.data.service === 'notification') {
-                assert.step(`display notification "${ev.data.args[0].title}"`);
+                assert.step(`display notification "${ev.data.args[0].message}"`);
             }
         }, true);
 
@@ -209,7 +198,7 @@ QUnit.module('hr', {}, function () {
         assert.verifySteps([
             'read foo 1',
             'read hr.employee 11',
-            'display notification "Cannot chat with yourself"',
+            'display notification "You cannot chat with yourself"',
         ]);
 
         form.destroy();

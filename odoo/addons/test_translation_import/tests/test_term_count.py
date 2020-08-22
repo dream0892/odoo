@@ -269,6 +269,72 @@ class TestTermCount(common.TransactionCase):
                 self.assertEqual(row['src'], "Accounting")
                 self.assertEqual(row['value'], "samva")
 
+    def test_translation_placeholder(self):
+        """Verify placeholder use in _()"""
+        context = {'lang': "fr_BE"}
+        self.env.ref("base.lang_fr_BE").active = True
+
+        # translation with positional placeholders
+        translation = self.env['ir.translation'].create({
+            'src': 'Text with %s placeholder',
+            'value': 'Text avec %s marqueur',
+            'type': 'code',
+            'name': 'addons/test_translation_import/tests/test_count_term.py',
+            'res_id': 0,
+            'lang': 'fr_BE',
+        })
+
+        # correctly translate
+        self.assertEqual(
+            _("Text with %s placeholder", 1),
+            "Text avec 1 marqueur",
+            "Translation placeholders were not applied"
+        )
+
+        # source error: wrong arguments
+        with self.assertRaises(TypeError), self.cr.savepoint():
+            _("Text with %s placeholder", 1, "🧀")
+
+        # translation error: log error and fallback on source
+        translation.value = "Text avec s% marqueur"
+        with self.assertLogs('odoo.tools.translate', 'ERROR'):
+            self.assertEqual(
+                _("Text with %s placeholder", 1),
+                "Text with 1 placeholder",
+                "Fallback to source was not used for bad translation"
+            )
+
+
+        # translation with named placeholders
+        translation = self.env['ir.translation'].create({
+            'src': 'Text with %(num)s placeholders %(symbol)s',
+            'value': 'Text avec %(num)s marqueurs %(symbol)s',
+            'type': 'code',
+            'name': 'addons/test_translation_import/tests/test_count_term.py',
+            'res_id': 0,
+            'lang': 'fr_BE',
+        })
+
+        # correctly translate
+        self.assertEqual(
+            _("Text with %(num)s placeholders %(symbol)s", num=2, symbol="🧀"),
+            "Text avec 2 marqueurs 🧀",
+            "Translation placeholders were not applied"
+        )
+
+        # source error: wrong arguments
+        with self.assertRaises(KeyError), self.cr.savepoint():
+            _("Text with %(num)s placeholders %(symbol)s", symbol="🧀")
+
+        # translation error: log error and fallback on source
+        translation.value = "Text avec %(num)s marqueurs %(symbole)s"
+        with self.assertLogs('odoo.tools.translate', 'ERROR'):
+            self.assertEqual(
+                _("Text with %(num)s placeholders %(symbol)s", num=2, symbol="🧀"),
+                "Text with 2 placeholders 🧀",
+                "Fallback to source was not used for bad translation"
+            )
+
 
 @tagged('post_install', '-at_install')
 class TestTranslationFlow(common.TransactionCase):
@@ -319,6 +385,35 @@ class TestTranslationFlow(common.TransactionCase):
         ])
 
         self.assertEqual(init_translation_count, len(import_translation))
+
+    def test_export_import_csv(self):
+        """ Ensure can reimport exported csv """
+        self.env.ref("base.lang_fr").active = True
+
+        module = self.env.ref('base.module_test_translation_import')
+        export = self.env["base.language.export"].create({
+            'lang': 'fr_FR',
+            'format': 'csv',
+            'modules': [(6, 0, [module.id])]
+        })
+        export.act_getfile()
+        po_file = export.data
+        self.assertIsNotNone(po_file)
+
+        self.env["ir.translation"].search([
+            ('lang', '=', 'fr_FR'),
+            ('module', '=', 'test_translation_import')
+        ]).unlink()
+
+        import_fr = self.env["base.language.import"].create({
+            'name': 'French',
+            'code': 'fr_FR',
+            'data': export.data,
+            'filename': export.name,
+            'overwrite': False,
+        })
+        with mute_logger('odoo.addons.base.models.res_lang'):
+            import_fr.with_context(create_empty_translation=True).import_lang()
 
     def test_export_static_templates(self):
         trans_static = []

@@ -935,7 +935,7 @@ class Message(models.Model):
             MailThread.message_notify(
                 partner_ids=moderator.partner_id.ids,
                 subject=_('Message are pending moderation'),  # tocheck: target language
-                body=template.render({'record': moderator.partner_id}, engine='ir.qweb', minimal_qcontext=True),
+                body=template._render({'record': moderator.partner_id}, engine='ir.qweb', minimal_qcontext=True),
                 email_from=moderator.company_id.catchall_formatted or moderator.company_id.email_formatted,
             )
 
@@ -969,7 +969,9 @@ class Message(models.Model):
                     'filename': attachment.name,
                     'name': attachment.name,
                     'mimetype': 'application/octet-stream' if safari and attachment.mimetype and 'video' in attachment.mimetype else attachment.mimetype,
-                    'is_main': main_attachment == attachment
+                    'is_main': main_attachment == attachment,
+                    'res_id': attachment.res_id,
+                    'res_model': attachment.res_model,
                 })
 
             # Tracking values
@@ -1022,11 +1024,13 @@ class Message(models.Model):
         if moderated_channel_ids:
             # Split load moderated and regular messages, as the ORed domain can
             # cause performance issues on large databases.
-            moderated_messages_dom = [('model', '=', 'mail.channel'),
-                                      ('res_id', 'in', moderated_channel_ids),
-                                      '|',
-                                      ('author_id', '=', self.env.user.partner_id.id),
-                                      ('need_moderation', '=', True)]
+            moderated_messages_dom = [
+                ('model', '=', 'mail.channel'),
+                ('res_id', 'in', moderated_channel_ids),
+                '|',
+                ('author_id', '=', self.env.user.partner_id.id),
+                ('moderation_status', '=', 'pending_moderation'),
+            ]
             messages |= self.search(moderated_messages_dom, limit=limit)
             # Truncate the results to `limit`
             messages = messages.sorted(key='id', reverse=True)[:limit]
@@ -1111,17 +1115,15 @@ class Message(models.Model):
         Notifications hold the information about each recipient of a message: if
         the message was successfully sent or if an exception or bounce occurred.
         """
-        return {
-            message.id: {
-                'message_id': message.id,
-                'model_name': message.env['ir.model']._get(message.model).display_name,
-                'res_id': message.res_id,
-                'model': message.model,
-                'last_message_date': message.date,
-                'message_type': message.message_type,
-                'notifications': message.notification_ids._filtered_for_web_client()._notification_format(),
-            } for message in self
-        }
+        return [{
+            'id': message.id,
+            'res_id': message.res_id,
+            'model': message.model,
+            'res_model_name': message.env['ir.model']._get(message.model).display_name,
+            'date': message.date,
+            'message_type': message.message_type,
+            'notifications': message.notification_ids._filtered_for_web_client()._notification_format(),
+        } for message in self]
 
     def _notify_message_notification_update(self):
         """Send bus notifications to update status of notifications in the web

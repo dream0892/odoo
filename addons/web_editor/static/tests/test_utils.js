@@ -12,11 +12,11 @@ const COLOR_PICKER_TEMPLATE = `
     <t t-name="web_editor.colorpicker">
         <colorpicker>
             <div class="o_colorpicker_section" data-name="theme" data-display="Theme Colors" data-icon-class="fa fa-flask">
-                <button data-color="alpha"/>
-                <button data-color="beta"/>
-                <button data-color="gamma"/>
-                <button data-color="delta"/>
-                <button data-color="epsilon"/>
+                <button data-color="o-color-1"/>
+                <button data-color="o-color-2"/>
+                <button data-color="o-color-3"/>
+                <button data-color="o-color-4"/>
+                <button data-color="o-color-5"/>
             </div>
             <div class="o_colorpicker_section" data-name="transparent_grayscale" data-display="Transparent Colors" data-icon-class="fa fa-eye-slash">
                 <button class="o_btn_transparent"/>
@@ -34,9 +34,7 @@ const SNIPPETS_TEMPLATE = `
     <h2 id="snippets_menu">Add blocks</h2>
     <div id="o_scroll">
         <div id="snippet_structure" class="o_panel">
-            <div class="o_panel_header">
-                <i class="fa fa-th-large"/> First Panel
-            </div>
+            <div class="o_panel_header">First Panel</div>
             <div class="o_panel_body">
                 <div name="Separator" data-oe-type="snippet" data-oe-thumbnail="/website/static/src/img/snippets_thumbs/s_separator.png">
                     <div class="s_hr pt32 pb32">
@@ -68,7 +66,7 @@ const SNIPPETS_TEMPLATE = `
         <div data-selector=".test_option_all">
             <we-colorpicker string="Background Color" data-select-style="true" data-css-property="background-color" data-color-prefix="bg-"/>
         </div>
-        <div data-js="background" data-selector=".test_option_all">
+        <div data-js="BackgroundImage" data-selector=".test_option_all">
             <we-button data-choose-image="true" data-no-preview="true">
                 <i class="fa fa-picture-o"/> Background Image
             </we-button>
@@ -98,7 +96,7 @@ MockServer.include({
             if (args.method === 'read_template' && args.args[0] === "web_editor.colorpicker") {
                 return COLOR_PICKER_TEMPLATE;
             }
-            if (args.method === 'render_template' && args.args[0] === "web_editor.snippets") {
+            if (args.method === 'render_public_asset' && args.args[0] === "web_editor.snippets") {
                 return SNIPPETS_TEMPLATE;
             }
         }
@@ -271,13 +269,13 @@ function wysiwygData(data) {
                 description: '',
                 mimetype: 'image/png',
                 checksum: false,
-                url: '/web_editor/static/src/img/transparent.png',
+                url: '/web/static/src/img/transparent.png',
                 type: 'url',
                 res_id: 0,
                 res_model: false,
                 public: true,
                 access_token: false,
-                image_src: '/web_editor/static/src/img/transparent.png',
+                image_src: '/web/static/src/img/transparent.png',
                 image_width: 256,
                 image_height: 256,
             }],
@@ -293,12 +291,12 @@ function wysiwygData(data) {
  *
  * @param {object} params
  */
-function createWysiwyg(params) {
+async function createWysiwyg(params) {
     patch();
     params.data = wysiwygData(params.data);
 
     var parent = new Widget();
-    testUtils.mock.addMockEnvironment(parent, params);
+    await testUtils.mock.addMockEnvironment(parent, params);
 
     var wysiwygOptions = _.extend({}, params.wysiwygOptions, {
         recordInfo: {

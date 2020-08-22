@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server saas~13.3\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-04-21 10:46+0000\n"
-"PO-Revision-Date: 2020-04-21 10:46+0000\n"
+"POT-Creation-Date: 2020-07-02 08:18+0000\n"
+"PO-Revision-Date: 2020-07-02 08:18+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -124,11 +124,6 @@ msgid "%s is not a stored field"
 msgstr ""
 
 #. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "&amp;nbsp;<span>on</span>"
-msgstr ""
-
-#. module: account
 #: model:ir.actions.report,print_report_name:account.account_invoices
 #: model:ir.actions.report,print_report_name:account.account_invoices_without_payment
 msgid "(object._get_report_base_filename())"
@@ -162,6 +157,11 @@ msgstr ""
 #. module: account
 #: model:account.payment.term,name:account.account_payment_term_30days
 msgid "30 Days"
+msgstr ""
+
+#. module: account
+#: model:account.payment.term,name:account.account_payment_term_advance
+msgid "30% Advance End of Following Month"
 msgstr ""
 
 #. module: account
@@ -2608,6 +2608,7 @@ msgstr ""
 #: model:ir.model.fields.selection,name:account.selection__account_invoice_report__state__cancel
 #: model:ir.model.fields.selection,name:account.selection__account_move__state__cancel
 #: model:ir.model.fields.selection,name:account.selection__account_payment__state__cancelled
+#: model_terms:ir.ui.view,arch_db:account.view_account_invoice_filter
 msgid "Cancelled"
 msgstr ""
 
@@ -6108,7 +6109,6 @@ msgstr ""
 #: code:addons/account/models/account_bank_statement.py:0
 #: code:addons/account/static/src/js/mail_activity.js:0
 #: model:ir.actions.act_window,name:account.action_move_journal_line
-#: model:ir.model,name:account.model_account_move
 #: model:ir.ui.menu,name:account.menu_action_move_journal_line_form
 #: model_terms:ir.ui.view,arch_db:account.account_journal_dashboard_kanban_view
 #: model_terms:ir.ui.view,arch_db:account.view_account_journal_form
@@ -6127,6 +6127,7 @@ msgstr ""
 #. module: account
 #. openerp-web
 #: code:addons/account/static/src/js/mail_activity.js:0
+#: model:ir.model,name:account.model_account_move
 #: model:ir.model.fields,field_description:account.field_account_move_line__move_id
 #: model:ir.model.fields.selection,name:account.selection__account_move__move_type__entry
 #: model_terms:ir.ui.view,arch_db:account.account_journal_dashboard_kanban_view
@@ -6749,11 +6750,6 @@ msgid "Mail Activity Type"
 msgstr ""
 
 #. module: account
-#: model:ir.model.fields,field_description:account.field_account_invoice_send__mailing_list_ids
-msgid "Mailing List"
-msgstr ""
-
-#. module: account
 #: model:ir.model.fields,field_description:account.field_account_bank_statement__message_main_attachment_id
 #: model:ir.model.fields,field_description:account.field_account_journal__message_main_attachment_id
 #: model:ir.model.fields,field_description:account.field_account_move__message_main_attachment_id
@@ -6835,21 +6831,6 @@ msgstr ""
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_payment__payment_difference_handling__reconcile
 msgid "Mark invoice as fully paid"
-msgstr ""
-
-#. module: account
-#: model:ir.model.fields,field_description:account.field_account_invoice_send__mass_mailing_id
-msgid "Mass Mailing"
-msgstr ""
-
-#. module: account
-#: model:ir.model.fields,field_description:account.field_account_invoice_send__campaign_id
-msgid "Mass Mailing Campaign"
-msgstr ""
-
-#. module: account
-#: model:ir.model.fields,field_description:account.field_account_invoice_send__mass_mailing_name
-msgid "Mass Mailing Name"
 msgstr ""
 
 #. module: account
@@ -7985,6 +7966,11 @@ msgid "Payment terms: 30 Days"
 msgstr ""
 
 #. module: account
+#: model:account.payment.term,note:account.account_payment_term_advance
+msgid "Payment terms: 30% Advance End of Following Month"
+msgstr ""
+
+#. module: account
 #: model:account.payment.term,note:account.account_payment_term_advance_60days
 msgid "Payment terms: 30% Now, Balance 60 Days"
 msgstr ""
@@ -8130,6 +8116,12 @@ msgstr ""
 msgid ""
 "Please install a chart of accounts or create a miscellaneous journal before "
 "proceeding."
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_cash_rounding.py:0
+#, python-format
+msgid "Please set a positive rounding value."
 msgstr ""
 
 #. module: account
@@ -8923,6 +8915,11 @@ msgid "Reversal Date"
 msgstr ""
 
 #. module: account
+#: model:ir.model.fields,field_description:account.field_account_move__reversal_move_id
+msgid "Reversal Move"
+msgstr ""
+
+#. module: account
 #: model:ir.model.fields,field_description:account.field_account_move_reversal__date
 msgid "Reversal date"
 msgstr ""
@@ -9368,6 +9365,11 @@ msgstr ""
 #. module: account
 #: model:ir.actions.act_window,name:account.account_send_payment_receipt_by_email_action
 msgid "Send receipt by email"
+msgstr ""
+
+#. module: account
+#: model:ir.actions.act_window,name:account.account_send_payment_receipt_by_email_action_multi
+msgid "Send receipts by email"
 msgstr ""
 
 #. module: account
@@ -12381,6 +12383,12 @@ msgid "You cannot delete an entry which has been posted once."
 msgstr ""
 
 #. module: account
+#: code:addons/account/models/account_move.py:0
+#, python-format
+msgid "You cannot delete an item linked to a posted entry."
+msgstr ""
+
+#. module: account
 #: code:addons/account/models/res_config_settings.py:0
 #, python-format
 msgid ""
@@ -12609,12 +12617,6 @@ msgid ""
 msgstr ""
 
 #. module: account
-#: code:addons/account/models/account.py:0
-#, python-format
-msgid "You must first define an opening move."
-msgstr ""
-
-#. module: account
 #: code:addons/account/models/account_move.py:0
 #, python-format
 msgid "You need to add a line before posting."
@@ -12645,6 +12647,12 @@ msgid ""
 "You should configure the 'Loss Exchange Rate Account' in the accounting "
 "settings, to manage automatically the booking of accounting entries related "
 "to differences between exchange rates."
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_cash_rounding.py:33
+#, python-format
+msgid "Please set a positive rounding value."
 msgstr ""
 
 #. module: account
@@ -12775,6 +12783,11 @@ msgid "of the following month"
 msgstr ""
 
 #. module: account
+#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
+msgid "on"
+msgstr ""
+
+#. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_move_form
 msgid "outstanding debits"
 msgstr ""
@@ -12842,4 +12855,10 @@ msgstr ""
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_bank_statement_form
 msgid "→ Count"
+msgstr ""
+
+#. module: account
+#: code:addons/account/wizard/account_resequence.py:0
+#, python-format
+msgid "You can not reorder sequence by date when the journal is locked with a hash."
 msgstr ""

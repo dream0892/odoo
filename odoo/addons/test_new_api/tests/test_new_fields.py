@@ -158,6 +158,78 @@ class TestFields(TransactionCaseWithUserDemo):
         field = self.env['test_new_api.message']._fields['x_bool_false_computed']
         self.assertFalse(field.depends)
 
+    def test_10_computed_custom_invalid_transitive_depends(self):
+        self.patch(type(self.env["ir.model.fields"]), "_check_depends", lambda self: True)
+        self.env["ir.model.fields"].create(
+            {
+                "name": "x_computed_custom_valid_depends",
+                "model_id": self.env.ref("test_new_api.model_test_new_api_foo").id,
+                "state": "manual",
+                "field_description": "A compute with a valid depends",
+                "compute": "for r in self: r['x_computed_custom_valid_depends'] = False",
+                "depends": "value1",
+                "store": False,
+                "ttype": "boolean",
+            }
+        )
+        self.env["ir.model.fields"].create(
+            {
+                "name": "x_computed_custom_valid_transitive_depends",
+                "model_id": self.env.ref("test_new_api.model_test_new_api_foo").id,
+                "state": "manual",
+                "field_description": "A compute with a valid transitive depends",
+                "compute": "for r in self: r['x_computed_custom_valid_transitive_depends'] = False",
+                "depends": "x_computed_custom_valid_depends",
+                "store": False,
+                "ttype": "boolean",
+            }
+        )
+        self.env["ir.model.fields"].create(
+            {
+                "name": "x_computed_custom_invalid_depends",
+                "model_id": self.env.ref("test_new_api.model_test_new_api_foo").id,
+                "state": "manual",
+                "field_description": "A compute with an invalid depends",
+                "compute": "for r in self: r['x_computed_custom_invalid_depends'] = False",
+                "depends": "bar",
+                "store": False,
+                "ttype": "boolean",
+            }
+        )
+        self.env["ir.model.fields"].create(
+            {
+                "name": "x_computed_custom_invalid_transitive_depends",
+                "model_id": self.env.ref("test_new_api.model_test_new_api_foo").id,
+                "state": "manual",
+                "field_description": "A compute with an invalid transitive depends",
+                "compute": "for r in self: r['x_computed_custom_invalid_transitive_depends'] = False",
+                "depends": "x_computed_custom_invalid_depends",
+                "store": False,
+                "ttype": "boolean",
+            }
+        )
+        fields = self.env["test_new_api.foo"]._fields
+        triggers = self.env.registry.field_triggers
+        value1 = fields["value1"]
+        valid_depends = fields["x_computed_custom_valid_depends"]
+        valid_transitive_depends = fields["x_computed_custom_valid_transitive_depends"]
+        invalid_depends = fields["x_computed_custom_invalid_depends"]
+        invalid_transitive_depends = fields["x_computed_custom_invalid_transitive_depends"]
+        # `x_computed_custom_valid_depends` in the triggers of the field `value1`
+        self.assertTrue(valid_depends in triggers[value1][None])
+        # `x_computed_custom_valid_transitive_depends` in the triggers `x_computed_custom_valid_depends` and `value1`
+        self.assertTrue(valid_transitive_depends in triggers[valid_depends][None])
+        self.assertTrue(valid_transitive_depends in triggers[value1][None])
+        # `x_computed_custom_invalid_depends` not in any triggers, as it was invalid and was skipped
+        self.assertEqual(
+            sum(invalid_depends in field_triggers.get(None, []) for field_triggers in triggers.values()), 0
+        )
+        # `x_computed_custom_invalid_transitive_depends` in the triggers of `x_computed_custom_invalid_depends` only
+        self.assertTrue(invalid_transitive_depends in triggers[invalid_depends][None])
+        self.assertEqual(
+            sum(invalid_transitive_depends in field_triggers.get(None, []) for field_triggers in triggers.values()), 1
+        )
+
     def test_10_display_name(self):
         """ test definition of automatic field 'display_name' """
         field = type(self.env['test_new_api.discussion']).display_name
@@ -250,7 +322,7 @@ class TestFields(TransactionCaseWithUserDemo):
 
     def test_11_stored_protected(self):
         """ test protection against recomputation """
-        model = self.env['test_new_api.compute.protected']
+        model = self.env['test_new_api.compute.readonly']
         field = model._fields['bar']
 
         record = model.create({'foo': 'unprotected #1'})
@@ -542,6 +614,25 @@ class TestFields(TransactionCaseWithUserDemo):
         with self.assertRaises(ValidationError):
             discussion.name = "X"
             discussion.flush()
+
+    def test_16_compute_unassigned(self):
+        model = self.env['test_new_api.compute.unassigned']
+
+        # real record
+        record = model.create({})
+        with self.assertRaises(ValueError):
+            record.bar
+        self.assertEqual(record.bare, False)
+        self.assertEqual(record.bars, False)
+        self.assertEqual(record.bares, False)
+
+        # new record
+        record = model.new()
+        with self.assertRaises(ValueError):
+            record.bar
+        self.assertEqual(record.bare, False)
+        self.assertEqual(record.bars, False)
+        self.assertEqual(record.bares, False)
 
     def test_20_float(self):
         """ test rounding of float fields """
@@ -999,9 +1090,9 @@ class TestFields(TransactionCaseWithUserDemo):
         tag2 = self.env['test_new_api.multi.tag'].create({'name': 'Quuz'})
 
         # create default values for the company-dependent fields
-        self.env['ir.property'].set_default('foo', 'test_new_api.company', 'default')
-        self.env['ir.property'].set_default('foo', 'test_new_api.company', 'default1', company1)
-        self.env['ir.property'].set_default('tag_id', 'test_new_api.company', tag0)
+        self.env['ir.property']._set_default('foo', 'test_new_api.company', 'default')
+        self.env['ir.property']._set_default('foo', 'test_new_api.company', 'default1', company1)
+        self.env['ir.property']._set_default('tag_id', 'test_new_api.company', tag0)
 
         # assumption: users don't have access to 'ir.property'
         accesses = self.env['ir.model.access'].search([('model_id.model', '=', 'ir.property')])
@@ -1378,6 +1469,45 @@ class TestFields(TransactionCaseWithUserDemo):
         self.assertNotEqual(new_disc.participants, disc.participants)
         self.assertEqual(new_disc.participants._origin, disc.participants)
 
+    def test_41_new_compute(self):
+        """ Check recomputation of fields on new records. """
+        move = self.env['test_new_api.move'].create({
+            'line_ids': [(0, 0, {'quantity': 1}), (0, 0, {'quantity': 1})],
+        })
+        move.flush()
+        line = move.line_ids[0]
+
+        new_move = move.new(origin=move)
+        new_line = line.new(origin=line)
+
+        # move_id is fetched from origin
+        self.assertEqual(new_line.move_id, move)
+        self.assertEqual(new_move.quantity, 2)
+        self.assertEqual(move.quantity, 2)
+
+        # modifying new_line must trigger recomputation on new_move, even if
+        # new_line.move_id is not new_move!
+        new_line.quantity = 2
+        self.assertEqual(new_line.move_id, move)
+        self.assertEqual(new_move.quantity, 3)
+        self.assertEqual(move.quantity, 2)
+
+    def test_41_new_one2many(self):
+        """ Check command on one2many field on new record. """
+        move = self.env['test_new_api.move'].create({})
+        line = self.env['test_new_api.move_line'].create({'move_id': move.id, 'quantity': 1})
+        move.flush()
+
+        new_move = move.new(origin=move)
+        new_line = line.new(origin=line)
+        self.assertEqual(new_move.line_ids, new_line)
+
+        # drop line, and create a new one
+        new_move.line_ids = [(2, new_line.id), (0, 0, {'quantity': 2})]
+        self.assertEqual(len(new_move.line_ids), 1)
+        self.assertFalse(new_move.line_ids.id)
+        self.assertEqual(new_move.line_ids.quantity, 2)
+
     @mute_logger('odoo.addons.base.models.ir_model')
     def test_41_new_related(self):
         """ test the behavior of related fields starting on new records. """
@@ -1529,6 +1659,21 @@ class TestFields(TransactionCaseWithUserDemo):
         # accidentally override 'move_id' (by prefetch).
         line.move_id = move2
         self.assertEqual(line.move_id, move2)
+
+    def test_72_relational_inverse(self):
+        """ Check the consistency of relational fields with inverse(s). """
+        move1 = self.env['test_new_api.move'].create({})
+        move2 = self.env['test_new_api.move'].create({})
+
+        # makes sure that line.move_id is flushed before search
+        line = self.env['test_new_api.move_line'].create({'move_id': move1.id})
+        moves = self.env['test_new_api.move'].search([('line_ids', 'in', line.id)])
+        self.assertEqual(moves, move1)
+
+        # makes sure that line.move_id is flushed before search
+        line.move_id = move2
+        moves = self.env['test_new_api.move'].search([('line_ids', 'in', line.id)])
+        self.assertEqual(moves, move2)
 
     def test_80_copy(self):
         Translations = self.env['ir.translation']
@@ -2499,6 +2644,11 @@ class TestSelectionDeleteUpdate(common.TransactionCase):
 
     MODEL_ABSTRACT = 'test_new_api.state_mixin'
 
+    def setUp(self):
+        super().setUp()
+        # enable unlinking ir.model.fields.selection
+        self.patch(self.registry, 'ready', False)
+
     def test_unlink_asbtract(self):
         self.env['ir.model.fields.selection'].search([
             ('field_id.model', '=', self.MODEL_ABSTRACT),
@@ -2711,3 +2861,144 @@ class TestSelectionOndeleteAdvanced(common.TransactionCase):
 
         with self.assertRaises(ValueError):
             self.registry.setup_models(self.env.cr)
+
+
+def insert(model, *fnames):
+    """ Return the expected query string to INSERT the given columns. """
+    columns = ['create_uid', 'create_date', 'write_uid', 'write_date'] + sorted(fnames)
+    return 'INSERT INTO "{}" ("id", {}) VALUES (nextval(%s), {}) RETURNING id'.format(
+        model._table,
+        ", ".join('"{}"'.format(column) for column in columns),
+        ", ".join('%s' for column in columns),
+    )
+
+
+def update(model, *fnames):
+    """ Return the expected query string to UPDATE the given columns. """
+    columns = sorted(fnames) + ['write_uid', 'write_date']
+    return 'UPDATE "{}" SET {} WHERE id IN %s'.format(
+        model._table,
+        ", ".join('"{}" = %s'.format(column) for column in columns),
+    )
+
+
+class TestComputeQueries(common.TransactionCase):
+    """ Test the queries made by create() with computed fields. """
+
+    def test_compute_readonly(self):
+        model = self.env['test_new_api.compute.readonly']
+        model.create({})
+
+        # no value, no default
+        with self.assertQueries([insert(model, 'foo'), update(model, 'bar')]):
+            record = model.create({'foo': 'Foo'})
+        self.assertEqual(record.bar, 'Foo')
+
+        # some value, no default
+        with self.assertQueries([insert(model, 'foo', 'bar'), update(model, 'bar')]):
+            record = model.create({'foo': 'Foo', 'bar': 'Bar'})
+        self.assertEqual(record.bar, 'Foo')
+
+        model = model.with_context(default_bar='Def')
+
+        # no value, some default
+        with self.assertQueries([insert(model, 'foo', 'bar'), update(model, 'bar')]):
+            record = model.create({'foo': 'Foo'})
+        self.assertEqual(record.bar, 'Foo')
+
+        # some value, some default
+        with self.assertQueries([insert(model, 'foo', 'bar'), update(model, 'bar')]):
+            record = model.create({'foo': 'Foo', 'bar': 'Bar'})
+        self.assertEqual(record.bar, 'Foo')
+
+    def test_compute_readwrite(self):
+        model = self.env['test_new_api.compute.readwrite']
+        model.create({})
+
+        # no value, no default
+        with self.assertQueries([insert(model, 'foo'), update(model, 'bar')]):
+            record = model.create({'foo': 'Foo'})
+        self.assertEqual(record.bar, 'Foo')
+
+        # some value, no default
+        with self.assertQueries([insert(model, 'foo', 'bar')]):
+            record = model.create({'foo': 'Foo', 'bar': 'Bar'})
+        self.assertEqual(record.bar, 'Bar')
+
+        model = model.with_context(default_bar='Def')
+
+        # no value, some default
+        with self.assertQueries([insert(model, 'foo', 'bar')]):
+            record = model.create({'foo': 'Foo'})
+        self.assertEqual(record.bar, 'Def')
+
+        # some value, some default
+        with self.assertQueries([insert(model, 'foo', 'bar')]):
+            record = model.create({'foo': 'Foo', 'bar': 'Bar'})
+        self.assertEqual(record.bar, 'Bar')
+
+    def test_compute_inverse(self):
+        model = self.env['test_new_api.compute.inverse']
+        model.create({})
+
+        # no value, no default
+        with self.assertQueries([insert(model, 'foo'), update(model, 'bar')]):
+            record = model.create({'foo': 'Foo'})
+        self.assertEqual(record.foo, 'Foo')
+        self.assertEqual(record.bar, 'Foo')
+
+        # some value, no default
+        with self.assertQueries([insert(model, 'foo', 'bar'), update(model, 'foo')]):
+            record = model.create({'foo': 'Foo', 'bar': 'Bar'})
+        self.assertEqual(record.foo, 'Bar')
+        self.assertEqual(record.bar, 'Bar')
+
+        model = model.with_context(default_bar='Def')
+
+        # no value, some default
+        with self.assertQueries([insert(model, 'foo', 'bar'), update(model, 'foo')]):
+            record = model.create({'foo': 'Foo'})
+        self.assertEqual(record.foo, 'Def')
+        self.assertEqual(record.bar, 'Def')
+
+        # some value, some default
+        with self.assertQueries([insert(model, 'foo', 'bar'), update(model, 'foo')]):
+            record = model.create({'foo': 'Foo', 'bar': 'Bar'})
+        self.assertEqual(record.foo, 'Bar')
+        self.assertEqual(record.bar, 'Bar')
+
+class test_shared_cache(TransactionCaseWithUserDemo):
+    def test_shared_cache_computed_field(self):
+        # Test case: Check that the shared cache is not used if a compute_sudo stored field
+        # is computed IF there is an ir.rule defined on this specific model.
+
+        # Real life example:
+        # A user can only see its own timesheets on a task, but the field "Planned Hours",
+        # which is stored-compute_sudo, should take all the timesheet lines into account
+        # However, when adding a new line and then recomputing the value, no existing line
+        # from another user is binded on self, then the value is erased and saved on the
+        # database.
+
+        task = self.env['test_new_api.model_shared_cache_compute_parent'].create({
+            'name': 'Shared Task'})
+        self.env['test_new_api.model_shared_cache_compute_line'].create({
+            'user_id': self.env.ref('base.user_admin').id,
+            'parent_id': task.id,
+            'amount': 1,
+        })
+        self.assertEqual(task.total_amount, 1)
+
+        self.env['base'].flush()
+        task.invalidate_cache()  # Start fresh, as it would be the case on 2 different sessions.
+
+        task = task.with_user(self.user_demo)
+        with common.Form(task) as task_form:
+            # Use demo has no access to the already existing line
+            self.assertEqual(len(task_form.line_ids), 0)
+            # But see the real total_amount
+            self.assertEqual(task_form.total_amount, 1)
+            # Now let's add a new line (and retrigger the compute method)
+            with task_form.line_ids.new() as line:
+                line.amount = 2
+            # The new value for total_amount, should be 3, not 2.
+            self.assertEqual(task_form.total_amount, 2)

@@ -2,10 +2,10 @@ $-editor-messages-margin-x: 2%;
 %o-editor-messages {
     width: 100% - $-editor-messages-margin-x * 2; // Need to be forced here to avoid flickering
     margin: 20px $-editor-messages-margin-x;
-    border: 2px dashed $o-we-color-text-normal;
-    padding: 112px 0px;
+    border: 2px dashed #999999;
+    padding: 12px 0px;
     text-align: center;
-    color: $o-we-color-text-normal;
+    color: #999999;
 
     &:before {
         content: attr(data-editor-message);
@@ -46,11 +46,9 @@ $-editor-messages-margin-x: 2%;
     }
 
     &.oe_structure.oe_empty, &[data-oe-type=html], .oe_structure.oe_empty {
-        &:empty {
+        &#wrap:empty, &#wrap > .oe_drop_zone.oe_insert:not(.oe_vertical):only-child {
             @extend %o-editor-messages;
-            &.oe_structure_small {
-                padding: 15px 0px;
-            }
+            padding: 112px 0px;
         }
         > .oe_drop_zone.oe_insert:not(.oe_vertical):only-child {
             @extend %o-editor-messages;
@@ -64,6 +62,13 @@ $-editor-messages-margin-x: 2%;
 }
 .editor_enable [data-oe-readonly]:hover {
     cursor: default;
+}
+.oe_structure_solo > .oe_drop_zone {
+    // TODO implement something more robust. This is currently for our only
+    // use case of oe_structure_solo: the footer. The dropzone in there need to
+    // be 1px lower that the end-of-page dropzone to distinguish them. The
+    // usability has to be reviewed anyway.
+    transform: translateY(10px); // For some reason "1px" is not enough...
 }
 
 /* Prevent the text contents of draggable elements from being selectable. */
@@ -128,8 +133,8 @@ table.editorbar-panel {
     }
 }
 
-.editor_enable .js_language_selector {
-    display: none;
+.editor_enable .o_add_language {
+    display: none !important;
 }
 
 // Facebook Page
@@ -143,21 +148,12 @@ table.editorbar-panel {
 }
 
 // s_popup in edit mode
-.editor_has_snippets {
-    .s_popup_main {
-        z-index: 1000 !important;
-        left: $o-we-sidebar-width !important;
-        top: var(--o-we-toolbar-height) !important;
-
-        &.s_popup_fixed {
-            .s_popup_full .s_popup_content {
-               left: $o-we-sidebar-width !important;
-            }
-        }
-        &.s_popup_fixed_top {
-            .s_popup_content {
-                top: var(--o-we-toolbar-height) !important;
-            }
+body.editor_enable.editor_has_snippets {
+    .s_popup .modal {
+        top: var(--o-we-toolbar-height);
+        background-color: transparent;
+        &.fade .modal-dialog {
+            transform: none;
         }
     }
 }

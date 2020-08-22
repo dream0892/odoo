@@ -89,8 +89,8 @@ QUnit.module('basic_fields', {
                     qux: false,
                     selection: 'done',
                 },
-                {id: 3, bar: true, foo: "gnap", int_field: 80, qux: -3.89859, m2o: 1, m2m: []},
-                {id: 5, bar: false, foo: "blop", int_field: -4, qux: 9.1, m2o: 1, m2m: [1], currency_id: 1}],
+                {id: 3, bar: true, foo: "gnap", int_field: 80, qux: -3.89859},
+                {id: 5, bar: false, foo: "blop", int_field: -4, qux: 9.1, currency_id: 1}],
                 onchanges: {},
             },
             product: {
@@ -117,6 +117,7 @@ QUnit.module('basic_fields', {
             },
             currency: {
                 fields: {
+                    digits: { string: "Digits" },
                     symbol: {string: "Currency Sumbol", type: "char", searchable: true},
                     position: {string: "Currency Position", type: "char", searchable: true},
                 },
@@ -1569,6 +1570,69 @@ QUnit.module('basic_fields', {
         form.destroy();
     });
 
+    QUnit.test('input field: change value before pending onchange returns (with fieldDebounce)', async function (assert) {
+        // this test is exactly the same as the previous one, except that we set
+        // here a fieldDebounce to accurately reproduce what happens in practice:
+        // the field doesn't notify the changes on 'input', but on 'change' event.
+        assert.expect(5);
+
+        this.data.partner.onchanges = {
+            product_id: function (obj) {
+                obj.int_field = obj.product_id ? 7 : false;
+            },
+        };
+
+        let def;
+        const form = await createView({
+            View: FormView,
+            model: 'partner',
+            data: this.data,
+            arch: `
+                <form>
+                    <field name="p">
+                        <tree editable="bottom">
+                            <field name="product_id"/>
+                            <field name="foo"/>
+                            <field name="int_field"/>
+                        </tree>
+                    </field>
+                </form>`,
+            async mockRPC(route, args) {
+                const result = this._super(...arguments);
+                if (args.method === "onchange") {
+                    await Promise.resolve(def);
+                }
+                return result;
+            },
+            fieldDebounce: 5000,
+        });
+
+        await testUtils.dom.click(form.$('.o_field_x2many_list_row_add a'));
+        assert.strictEqual(form.$('input[name="foo"]').val(), 'My little Foo Value',
+            'should contain the default value');
+
+        def = testUtils.makeTestPromise();
+
+        await testUtils.fields.many2one.clickOpenDropdown('product_id');
+        await testUtils.fields.many2one.clickHighlightedItem('product_id');
+
+        // set foo before onchange
+        await testUtils.fields.editInput(form.$('input[name="foo"]'), "tralala");
+        assert.strictEqual(form.$('input[name="foo"]').val(), 'tralala');
+        assert.strictEqual(form.$('input[name="int_field"]').val(), '');
+
+        // complete the onchange
+        def.resolve();
+        await testUtils.nextTick();
+
+        assert.strictEqual(form.$('input[name="foo"]').val(), 'tralala',
+            'foo should contain the same value as before onchange');
+        assert.strictEqual(form.$('input[name="int_field"]').val(), '7',
+            'int_field should contain the value returned by the onchange');
+
+        form.destroy();
+    });
+
     QUnit.test('input field: change value before pending onchange renaming', async function (assert) {
         assert.expect(3);
 
@@ -1676,6 +1740,54 @@ QUnit.module('basic_fields', {
             "password field input should be with type 'password' in edit mode");
         assert.strictEqual(form.$('input.o_field_char').val(), '',
             "password field input value should be the (non-hidden, empty) password value");
+
+        form.destroy();
+    });
+
+    QUnit.test('input field: set and remove value, then wait for onchange', async function (assert) {
+        assert.expect(2);
+
+        this.data.partner.onchanges = {
+            product_id(obj) {
+                obj.foo = obj.product_id ? "onchange value" : false;
+            },
+        };
+
+        let def;
+        const form = await createView({
+            View: FormView,
+            model: 'partner',
+            data: this.data,
+            arch: `
+                <form>
+                    <field name="p">
+                        <tree editable="bottom">
+                            <field name="product_id"/>
+                            <field name="foo"/>
+                        </tree>
+                    </field>
+                </form>`,
+            async mockRPC(route, args) {
+                const result = this._super(...arguments);
+                if (args.method === "onchange") {
+                    await Promise.resolve(def);
+                }
+                return result;
+            },
+            fieldDebounce: 1000, // needed to accurately mock what really happens
+        });
+
+        await testUtils.dom.click(form.$('.o_field_x2many_list_row_add a'));
+        assert.strictEqual(form.$('input[name="foo"]').val(), "");
+
+        await testUtils.fields.editInput(form.$('input[name="foo"]'), "test"); // set value for foo
+        await testUtils.fields.editInput(form.$('input[name="foo"]'), ""); // remove value for foo
+
+        // trigger the onchange by setting a product
+        await testUtils.fields.many2one.clickOpenDropdown('product_id');
+        await testUtils.fields.many2one.clickHighlightedItem('product_id');
+        assert.strictEqual(form.$('input[name="foo"]').val(), 'onchange value',
+            'input should contain correct value after onchange');
 
         form.destroy();
     });
@@ -3214,6 +3326,35 @@ QUnit.module('basic_fields', {
         form.destroy();
     });
 
+    QUnit.test('daterangepicker should disappear on scrolling outside of it', async function (assert) {
+        assert.expect(2);
+
+        this.data.partner.fields.datetime_end = {string: 'Datetime End', type: 'datetime'};
+        this.data.partner.records[0].datetime_end = '2017-03-13 00:00:00';
+
+        const form = await createView({
+            View: FormView,
+            model: 'partner',
+            data: this.data,
+            arch: `
+                <form>
+                    <field name="datetime" widget="daterange" options="{'related_end_date': 'datetime_end'}"/>
+                    <field name="datetime_end" widget="daterange" options="{'related_start_date': 'datetime'}"/>
+                </form>`,
+            res_id: 1,
+        });
+
+        await testUtils.form.clickEdit(form);
+        await testUtils.dom.click(form.$('.o_field_date_range:first'));
+
+        assert.isVisible($('.daterangepicker:first'), "date range picker should be opened");
+
+        form.el.dispatchEvent(new Event('scroll'));
+        assert.isNotVisible($('.daterangepicker:first'), "date range picker should be closed");
+
+        form.destroy();
+    });
+
     QUnit.module('FieldDate');
 
     QUnit.test('date field: toggle datepicker [REQUIRE FOCUS]', async function (assert) {
@@ -3751,6 +3892,36 @@ QUnit.module('basic_fields', {
         form.destroy();
     });
 
+    QUnit.test('date field: hit enter should update value', async function (assert) {
+        assert.expect(2);
+
+        const form = await createView({
+            View: FormView,
+            model: 'partner',
+            data: this.data,
+            arch:'<form string="Partners"><field name="date"/></form>',
+            res_id: 1,
+            translateParameters: {  // Avoid issues due to localization formats
+                date_format: '%m/%d/%Y',
+            },
+            viewOptions: {
+                mode: 'edit',
+            },
+        });
+
+        const year = (new Date()).getFullYear();
+
+        await testUtils.fields.editInput(form.el.querySelector('input[name="date"]'), '01/08');
+        await testUtils.fields.triggerKeydown(form.el.querySelector('input[name="date"]'), 'enter');
+        assert.strictEqual(form.el.querySelector('input[name="date"]').value, '01/08/' + year);
+
+        await testUtils.fields.editInput(form.el.querySelector('input[name="date"]'), '08/01');
+        await testUtils.fields.triggerKeydown(form.el.querySelector('input[name="date"]'), 'enter');
+        assert.strictEqual(form.el.querySelector('input[name="date"]').value, '08/01/' + year);
+
+        form.destroy();
+    });
+
     QUnit.module('FieldDatetime');
 
     QUnit.test('datetime field in form view', async function (assert) {
@@ -4183,13 +4354,13 @@ QUnit.module('basic_fields', {
 
         await testUtils.form.clickCreate(form);
         testUtils.dom.openDatepicker(form.$('.o_datepicker'));
-        $.each($('.day:last-child(),.day:nth-child(2)'), function (index, value) {
+        $.each($('.day:last-child,.day:nth-child(2)'), function (index, value) {
             assert.hasClass(value, 'disabled', 'first and last days must be disabled');
         });
         // the assertions below could be replaced by a single hasClass classic on the jQuery set using the idea
         // All not <=> not Exists. But we want to be sure that the set is non empty. We don't have an helper
         // function for that.
-        $.each($('.day:not(:last-child()):not(:nth-child(2))'), function (index, value) {
+        $.each($('.day:not(:last-child):not(:nth-child(2))'), function (index, value) {
             assert.doesNotHaveClass(value, 'disabled', 'other days must stay clickable');
         });
         form.destroy();
@@ -4288,7 +4459,7 @@ QUnit.module('basic_fields', {
             { id: 5, datetime: '2017-10-05 04:00:00' }, // - 3 days
             { id: 6, datetime: '2018-02-08 04:00:00' }, // + 4 months (diff >= 100 days)
             { id: 7, datetime: '2017-06-08 04:00:00' }, // - 4 months (diff >= 100 days)
-            { id: 6, datetime: false },
+            { id: 8, datetime: false },
         ];
 
         const list = await createView({
@@ -7125,7 +7296,10 @@ QUnit.module('basic_fields', {
                 call_service: function (ev) {
                     if (ev.data.service === 'notification') {
                         assert.strictEqual(ev.data.method, 'notify');
-                        assert.strictEqual(ev.data.args[0].title, 'Wrong value entered!');
+                        assert.strictEqual(
+                            ev.data.args[0].message,
+                            "Please enter a numerical value"
+                        );
                     }
                 }
             },
@@ -7148,7 +7322,7 @@ QUnit.module('basic_fields', {
 
     QUnit.module('FieldColor', {
         before: function () {
-            return ajax.loadXML('/web/static/src/xml/colorpicker_dialog.xml', core.qweb);
+            return ajax.loadXML('/web/static/src/xml/colorpicker.xml', core.qweb);
         },
     });
 

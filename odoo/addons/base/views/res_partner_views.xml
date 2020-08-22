@@ -43,18 +43,18 @@
             <field name="model">res.partner</field>
             <field eval="8" name="priority"/>
             <field name="arch" type="xml">
-                <tree string="Contacts">
+                <tree string="Contacts" sample="1">
                     <field name="display_name" string="Name"/>
                     <field name="function" invisible="1"/>
                     <field name="phone" class="o_force_ltr" optional="show"/>
                     <field name="email" optional="show"/>
-                    <field name="company_id" groups="base.group_multi_company"/>
-                    <field name="city" optional="hide"/>
+                    <field name="user_id" optional="show" widget="many2one_avatar_user"/>
+                    <field name="city" optional="show"/>
                     <field name="state_id" optional="hide"/>
-                    <field name="country_id" optional="hide"/>
+                    <field name="country_id" optional="show"/>
                     <field name="vat" optional="hide"/>
-                    <field name="category_id" optional="hide" widget="many2many_tags"/>
-                    <field name="user_id" invisible="1"/>
+                    <field name="category_id" optional="hide" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                    <field name="company_id" groups="base.group_multi_company"/>
                     <field name="is_company" invisible="1"/>
                     <field name="parent_id" invisible="1"/>
                     <field name="active" invisible="1"/>
@@ -425,7 +425,7 @@
             <field name="name">res.partner.kanban</field>
             <field name="model">res.partner</field>
             <field name="arch" type="xml">
-                <kanban class="o_res_partner_kanban">
+                <kanban class="o_res_partner_kanban" sample="1">
                     <field name="id"/>
                     <field name="color"/>
                     <field name="display_name"/>
@@ -470,12 +470,15 @@
                                         <li t-if="record.parent_id.raw_value and !record.function.raw_value"><field name="parent_id"/></li>
                                         <li t-if="!record.parent_id.raw_value and record.function.raw_value"><field name="function"/></li>
                                         <li t-if="record.parent_id.raw_value and record.function.raw_value"><field name="function"/> at <field name="parent_id"/></li>
-                                        <li t-if="record.city.raw_value and !record.country_id.raw_value"><field name="city"/></li>
-                                        <li t-if="!record.city.raw_value and record.country_id.raw_value"><field name="country_id"/></li>
-                                        <li t-if="record.city.raw_value and record.country_id.raw_value"><field name="city"/>, <field name="country_id"/></li>
+                                        <li t-if="record.city.raw_value or record.country_id.raw_value">
+                                            <t t-if="record.city.raw_value"><field name="city"/><t t-if="record.country_id.raw_value">, </t></t>
+                                            <t t-if="record.country_id.raw_value"><field name="country_id"/></t>
+                                        </li>
                                         <li t-if="record.email.raw_value" class="o_text_overflow"><field name="email"/></li>
                                     </ul>
-                                    <div class="oe_kanban_partner_links"/>
+                                    <div class="o_row">
+                                        <span class="oe_kanban_partner_links"/>
+                                    </div>
                                 </div>
                             </div>
                         </t>

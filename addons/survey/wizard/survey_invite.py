@@ -133,9 +133,10 @@ class SurveyInvite(models.TransientModel):
                     ('id', 'in', self.partner_ids.ids)
                 ])
                 if invalid_partners:
-                    raise UserError(
-                        _('The following recipients have no user account: %s. You should create user accounts for them or allow external signup in configuration.' %
-                            (','.join(invalid_partners.mapped('name')))))
+                    raise UserError(_(
+                        'The following recipients have no user account: %s. You should create user accounts for them or allow external signup in configuration.',
+                        ', '.join(invalid_partners.mapped('name'))
+                    ))
 
     @api.depends('template_id')
     def _compute_template_values(self):
@@ -234,7 +235,7 @@ class SurveyInvite(models.TransientModel):
                     'model_description': self.env['ir.model']._get('survey.survey').display_name,
                     'company': self.env.company,
                 }
-                body = template.render(template_ctx, engine='ir.qweb', minimal_qcontext=True)
+                body = template._render(template_ctx, engine='ir.qweb', minimal_qcontext=True)
                 mail_values['body_html'] = self.env['mail.render.mixin']._replace_local_links(body)
 
         return self.env['mail.mail'].sudo().create(mail_values)
@@ -252,7 +253,8 @@ class SurveyInvite(models.TransientModel):
             partner = False
             email_normalized = tools.email_normalize(email)
             if email_normalized:
-                partner = Partner.search([('email_normalized', '=', email_normalized)])
+                limit = None if self.survey_users_login_required else 1
+                partner = Partner.search([('email_normalized', '=', email_normalized)], limit=limit)
             if partner:
                 valid_partners |= partner
             else:

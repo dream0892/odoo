@@ -18,6 +18,9 @@ class Partner(models.Model):
     _inherit = ['res.partner', 'mail.activity.mixin', 'mail.thread.blacklist']
     _mail_flat_thread = False
 
+    email = fields.Char(tracking=1)
+    phone = fields.Char(tracking=2)
+
     channel_ids = fields.Many2many('mail.channel', 'mail_channel_partner', 'partner_id', 'channel_id', string='Channels', copy=False)
     # override the field to track the visibility of user
     user_id = fields.Many2one(tracking=True)
@@ -36,6 +39,7 @@ class Partner(models.Model):
             for r in self}
 
     @api.model
+    @api.returns('self', lambda value: value.id)
     def find_or_create(self, email, assert_valid_email=False):
         """ Override to use the email_normalized field. """
         if not email:
@@ -50,6 +54,15 @@ class Partner(models.Model):
                     return partners
 
         return super(Partner, self).find_or_create(email, assert_valid_email=assert_valid_email)
+
+    def mail_partner_format(self):
+        self.ensure_one()
+        return {
+            "id": self.name_get()[0][0],
+            "display_name": self.name_get()[0][1],
+            "name": self.name,
+            "active": self.active,
+        }
 
     @api.model
     def get_needaction_count(self):

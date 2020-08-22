@@ -69,7 +69,7 @@ class HolidaysAllocation(models.Model):
     notes = fields.Text('Reasons', readonly=True, states={'draft': [('readonly', False)], 'confirm': [('readonly', False)]})
     # duration
     number_of_days = fields.Float(
-        'Number of Days', compute='_compute_from_holiday_status_id', store=True, readonly=False, tracking=True,
+        'Number of Days', compute='_compute_from_holiday_status_id', store=True, readonly=False, tracking=True, default=1,
         help='Duration in days. Reference field to use when necessary.')
     number_of_days_display = fields.Float(
         'Duration (days)', compute='_compute_number_of_days_display',
@@ -260,8 +260,10 @@ class HolidaysAllocation(models.Model):
         for allocation in self:
             if allocation.parent_id and allocation.parent_id.type_request_unit == "hour":
                 allocation.number_of_hours_display = allocation.number_of_days * HOURS_PER_DAY
-            else:
+            elif allocation.number_of_days:
                 allocation.number_of_hours_display = allocation.number_of_days * (allocation.employee_id.sudo().resource_id.calendar_id.hours_per_day or HOURS_PER_DAY)
+            else:
+                allocation.number_of_hours_display = 0.0
 
     @api.depends('number_of_hours_display', 'number_of_days_display')
     def _compute_duration_display(self):
@@ -306,7 +308,7 @@ class HolidaysAllocation(models.Model):
             if allocation.holiday_type == 'company':
                 allocation.employee_id = False
                 if not allocation.mode_company_id:
-                    allocation.mode_company_id = self.env.user.company_id
+                    allocation.mode_company_id = self.env.company
                 allocation.category_id = False
             elif allocation.holiday_type == 'department':
                 allocation.employee_id = False
@@ -339,12 +341,14 @@ class HolidaysAllocation(models.Model):
             elif not holiday.holiday_status_id and not holiday._origin.holiday_status_id:
                 holiday.holiday_status_id = default_holiday_status_id
 
-    @api.depends('holiday_status_id', 'allocation_type')
+    @api.depends('holiday_status_id', 'allocation_type', 'number_of_hours_display', 'number_of_days_display')
     def _compute_from_holiday_status_id(self):
         for allocation in self:
+            allocation.number_of_days = allocation.number_of_days_display
+            if allocation.type_request_unit == 'hour':
+                allocation.number_of_days = allocation.number_of_hours_display / (allocation.employee_id.sudo().resource_calendar_id.hours_per_day or HOURS_PER_DAY)
+
             # set default values
-            if not allocation.number_of_days and not allocation._origin.number_of_days:
-                allocation.number_of_days = 1
             if not allocation.interval_number and not allocation._origin.interval_number:
                 allocation.interval_number = 1
             if not allocation.number_per_interval and not allocation._origin.number_per_interval:
@@ -360,7 +364,6 @@ class HolidaysAllocation(models.Model):
                     allocation.date_to = new_date_to
 
             if allocation.allocation_type == 'accrual':
-                allocation.number_of_days = 0
                 if allocation.holiday_status_id.request_unit == 'hour':
                     allocation.unit_per_interval = 'hours'
                 else:
@@ -389,11 +392,12 @@ class HolidaysAllocation(models.Model):
 
             res.append(
                 (allocation.id,
-                 _("Allocation of %s : %.2f %s to %s") %
-                 (allocation.holiday_status_id.sudo().name,
-                  allocation.number_of_hours_display if allocation.type_request_unit == 'hour' else allocation.number_of_days,
-                  'hours' if allocation.type_request_unit == 'hour' else 'days',
-                  target))
+                 _("Allocation of %(allocation_name)s : %(duration).2f %(duration_type)s to %(person)s",
+                   allocation_name=allocation.holiday_status_id.sudo().name,
+                   duration=allocation.number_of_hours_display if allocation.type_request_unit == 'hour' else allocation.number_of_days,
+                   duration_type='hours' if allocation.type_request_unit == 'hour' else 'days',
+                   person=target
+                ))
             )
         return res
 
@@ -410,7 +414,11 @@ class HolidaysAllocation(models.Model):
                 today = fields.Date.today()
 
                 if vstop < today:
-                    raise ValidationError(_('You can allocate %s only before %s.') % (allocation.holiday_status_id.display_name, allocation.holiday_status_id.validity_stop))
+                    raise ValidationError(_(
+                        'You can allocate %(allocation_type)s only before %(date)s.',
+                        allocation_type=allocation.holiday_status_id.display_name,
+                        date=allocation.holiday_status_id.validity_stop
+                    ))
 
     @api.model
     def create(self, values):
@@ -495,14 +503,14 @@ class HolidaysAllocation(models.Model):
         if any(holiday.state != 'confirm' for holiday in self):
             raise UserError(_('Allocation request must be confirmed ("To Approve") in order to approve it.'))
 
-        current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+        current_employee = self.env.user.employee_id
 
         self.filtered(lambda hol: hol.validation_type == 'both').write({'state': 'validate1', 'first_approver_id': current_employee.id})
         self.filtered(lambda hol: not hol.validation_type == 'both').action_validate()
         self.activity_update()
 
     def action_validate(self):
-        current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+        current_employee = self.env.user.employee_id
         for holiday in self:
             if holiday.state not in ['confirm', 'validate1']:
                 raise UserError(_('Allocation request must be confirmed in order to approve it.'))
@@ -539,7 +547,7 @@ class HolidaysAllocation(models.Model):
         return childs
 
     def action_refuse(self):
-        current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+        current_employee = self.env.user.employee_id
         if any(holiday.state not in ['confirm', 'validate', 'validate1'] for holiday in self):
             raise UserError(_('Allocation request must be confirmed or validated in order to refuse it.'))
 
@@ -557,7 +565,7 @@ class HolidaysAllocation(models.Model):
         """ Check if target state is achievable. """
         if self.env.is_superuser():
             return
-        current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+        current_employee = self.env.user.employee_id
         if not current_employee:
             return
         is_officer = self.env.user.has_group('hr_holidays.group_hr_holidays_user')
@@ -613,7 +621,12 @@ class HolidaysAllocation(models.Model):
     def activity_update(self):
         to_clean, to_do = self.env['hr.leave.allocation'], self.env['hr.leave.allocation']
         for allocation in self:
-            note = _('New Allocation Request created by %s: %s Days of %s') % (allocation.create_uid.name, allocation.number_of_days, allocation.holiday_status_id.name)
+            note = _(
+                'New Allocation Request created by %(user)s: %(count)s Days of %(allocation_type)s',
+                user=allocation.create_uid.name,
+                count=allocation.number_of_days,
+                allocation_type=allocation.holiday_status_id.name
+            )
             if allocation.state == 'draft':
                 to_clean |= allocation
             elif allocation.state == 'confirm':
